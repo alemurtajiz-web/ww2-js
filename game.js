@@ -1,5 +1,5 @@
 // ============================================================
-// DOGS OF WAR - WW2 FPS (Three.js) - REALISTIC UPDATE
+// DOGS OF GRUNDSCHULE PLANETRIUM - WW2 FPS (Three.js) - REALISTIC UPDATE
 // ============================================================
 
 // ---- QUALITY DETECTION ----
@@ -27,7 +27,7 @@ function detectQuality() {
 }
 
 const QUALITY = detectQuality();
-console.log('[DogsOfWar] Quality level:', QUALITY);
+console.log('[DogsOfGrunschulePlanetrium] Quality level:', QUALITY);
 
 // ---- TOUCH DETECTION ----
 const IS_TOUCH = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
@@ -51,9 +51,9 @@ const CFG = {
     ],
 
     ENEMY: {
-        grunt:  { hp: 60, speed: 3.5, damage: 10, fireRate: 1200, range: 40, detectRange: 50, score: 100, tunic: 0x5a6b52, pants: 0x4a5a42 },
-        sniper: { hp: 35, speed: 2, damage: 25, fireRate: 2500, range: 80, detectRange: 80, score: 200, tunic: 0x636b5e, pants: 0x50584a },
-        brute:  { hp: 150, speed: 2.5, damage: 15, fireRate: 700, range: 30, detectRange: 40, score: 300, tunic: 0x4e5648, pants: 0x3e4a38 },
+        grunt:  { hp: 60, speed: 3.5, damage: 10, fireRate: 1200, range: 40, detectRange: 50, score: 100, tunic: 0x8b1a1a, pants: 0x5c1010 },
+        sniper: { hp: 35, speed: 2, damage: 25, fireRate: 2500, range: 80, detectRange: 80, score: 200, tunic: 0xa02020, pants: 0x6b1515 },
+        brute:  { hp: 150, speed: 2.5, damage: 15, fireRate: 700, range: 30, detectRange: 40, score: 300, tunic: 0x701818, pants: 0x4a0e0e },
     },
 
     MAP_SIZE: 120,
@@ -83,9 +83,9 @@ const CFG = {
 
     MAX_ALLIES: QUALITY === 'low' ? 3 : QUALITY === 'medium' ? 4 : 5,
     ALLY: {
-        rifleman: { hp: 80, speed: 3.5, damage: 12, fireRate: 1000, range: 40, detectRange: 50, tunic: 0x6b7c3e, pants: 0x5a6b32 },
-        medic:    { hp: 60, speed: 3,   damage: 8,  fireRate: 1400, range: 30, detectRange: 45, tunic: 0x8a8a60, pants: 0x7a7a52, healRate: 10, healRange: 8 },
-        support:  { hp: 100, speed: 3,  damage: 10, fireRate: 600,  range: 35, detectRange: 50, tunic: 0x4a5530, pants: 0x3e4828 },
+        rifleman: { hp: 80, speed: 3.5, damage: 12, fireRate: 1000, range: 40, detectRange: 50, tunic: 0x1a3a8b, pants: 0x102a5c },
+        medic:    { hp: 60, speed: 3,   damage: 8,  fireRate: 1400, range: 30, detectRange: 45, tunic: 0x2050a0, pants: 0x18406b, healRate: 10, healRange: 8 },
+        support:  { hp: 100, speed: 3,  damage: 10, fireRate: 600,  range: 35, detectRange: 50, tunic: 0x182870, pants: 0x0e1e4a },
     },
 };
 
@@ -537,8 +537,8 @@ function createMaterials() {
     MAT.trench = new THREE.MeshStandardMaterial({ color: 0x3a2e1e, roughness: 0.95, metalness: 0 });
     MAT.crate = new THREE.MeshStandardMaterial({ color: 0x6b5030, roughness: 0.9, metalness: 0 });
     MAT.enemyHead = new THREE.MeshStandardMaterial({ color: 0xccaa88, roughness: 0.7, metalness: 0 });
-    MAT.helmet = new THREE.MeshStandardMaterial({ color: 0x4a5040, roughness: 0.65, metalness: 0.2 });
-    MAT.allyHelmet = new THREE.MeshStandardMaterial({ color: 0x5a6a30, roughness: 0.65, metalness: 0.2 });
+    MAT.helmet = new THREE.MeshStandardMaterial({ color: 0x5a2020, roughness: 0.65, metalness: 0.2 });
+    MAT.allyHelmet = new THREE.MeshStandardMaterial({ color: 0x1a3060, roughness: 0.65, metalness: 0.2 });
     MAT.door = new THREE.MeshStandardMaterial({ color: 0x3a2a1a, roughness: 0.85 });
     MAT.fire = new THREE.MeshBasicMaterial({ color: 0xff6622, transparent: true, opacity: 0.7 });
     MAT.fireGlow = new THREE.MeshBasicMaterial({ color: 0xffaa44, transparent: true, opacity: 0.4 });
