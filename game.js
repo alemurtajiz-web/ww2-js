@@ -599,15 +599,14 @@ let fireLights = []; // fire point lights for flickering
 function createMap() {
     const S = CFG.MAP_SIZE;
 
-    // Brown muddy ground with rough terrain — churned battlefield
-    const groundGeo = new THREE.PlaneGeometry(S * 2, S * 2, 80, 80);
+    // Brown muddy ground — lower resolution for performance
+    const groundGeo = new THREE.PlaneGeometry(S * 2, S * 2, 40, 40);
     const pos = groundGeo.attributes.position;
     for (let i = 0; i < pos.count; i++) {
         const x = pos.getX(i), y = pos.getY(i);
         const height = Math.sin(x * 0.06) * Math.cos(y * 0.06) * 0.7
             + Math.sin(x * 0.25 + 2) * Math.cos(y * 0.2) * 0.3
-            + Math.sin(x * 0.5) * 0.1
-            + Math.random() * 0.15;
+            + Math.random() * 0.12;
         pos.setZ(i, height);
     }
     groundGeo.computeVertexNormals();
@@ -616,24 +615,22 @@ function createMap() {
     ground.receiveShadow = true;
     scene.add(ground);
 
-    // Heavy mud/dirt patches — battlefield is torn up
-    const mudPatchCount = CFG.DIRT_PATCH_COUNT * 2;
-    for (let i = 0; i < mudPatchCount; i++) {
+    // Mud/dirt patches (reduced count)
+    for (let i = 0; i < CFG.DIRT_PATCH_COUNT; i++) {
         const dx = (Math.random() - 0.5) * S * 1.6;
         const dz = (Math.random() - 0.5) * S * 1.6;
-        const ds = 2 + Math.random() * 8;
-        const dirtGeo = new THREE.CircleGeometry(ds, 8);
+        const ds = 3 + Math.random() * 8;
+        const dirtGeo = new THREE.CircleGeometry(ds, 6);
         const mats = [MAT.dirt, MAT.mud, MAT.mudWet, MAT.mudLight, MAT.groundDark];
         const dirtMesh = new THREE.Mesh(dirtGeo, mats[Math.floor(Math.random() * mats.length)]);
         dirtMesh.rotation.x = -Math.PI / 2;
-        dirtMesh.position.set(dx, 0.03 + Math.random() * 0.02, dz);
+        dirtMesh.position.set(dx, 0.03, dz);
         dirtMesh.receiveShadow = true;
         scene.add(dirtMesh);
     }
 
-    // Many craters from artillery — heavily bombed ground
-    const craterCount = CFG.CRATER_COUNT * 3;
-    for (let i = 0; i < craterCount; i++) {
+    // Craters (use base count, not tripled)
+    for (let i = 0; i < CFG.CRATER_COUNT; i++) {
         const cx = (Math.random() - 0.5) * S * 1.4;
         const cz = (Math.random() - 0.5) * S * 1.4;
         const cr = 1 + Math.random() * 3;
@@ -642,89 +639,65 @@ function createMap() {
         }
     }
 
-    // === TRENCH NETWORK ===
-    // Allied trenches (south side — player spawn area)
+    // === TRENCH NETWORK (reduced — 6 trenches total) ===
+    // Allied trenches (south)
     createTrench(0, 15, 50, 0);              // main allied front line
-    createTrench(-30, 25, 25, 0);            // left support trench
-    createTrench(30, 25, 25, 0);             // right support trench
-    createTrench(-15, 20, 12, Math.PI / 2);  // communication trench left
-    createTrench(15, 20, 12, Math.PI / 2);   // communication trench right
-    createTrench(0, 30, 30, 0);              // rear reserve trench
+    createTrench(0, 28, 35, 0);              // rear support trench
 
-    // No man's land (center) — open, cratered, deadly
-    // Extra craters in no man's land
-    for (let i = 0; i < 12; i++) {
-        const cx = (Math.random() - 0.5) * 80;
-        const cz = (Math.random() - 0.5) * 20;
-        createCrater(cx, cz, 1.5 + Math.random() * 2.5);
+    // No man's land craters
+    for (let i = 0; i < 6; i++) {
+        const cx = (Math.random() - 0.5) * 70;
+        const cz = (Math.random() - 0.5) * 16;
+        createCrater(cx, cz, 1.5 + Math.random() * 2);
     }
 
-    // Enemy trenches (north side)
+    // Enemy trenches (north)
     createTrench(0, -20, 50, 0);             // main enemy front line
-    createTrench(-25, -30, 25, 0);           // left enemy support
-    createTrench(25, -30, 25, 0);            // right enemy support
-    createTrench(0, -25, 12, Math.PI / 2);   // enemy communication trench
-    createTrench(-35, -40, 20, 0);           // far rear enemy trench
-    createTrench(35, -40, 20, 0);            // far rear enemy trench
+    createTrench(0, -35, 35, 0);             // rear enemy trench
 
-    // === SANDBAG FORTIFICATIONS ===
-    // Allied side sandbag positions
-    createSandbagWall(-10, 12, 8, 0);
-    createSandbagWall(10, 12, 8, 0);
-    createSandbagWall(0, 35, 6, 0);
-    createSandbagWall(-25, 18, 5, 0.2);
-    createSandbagWall(25, 18, 5, -0.2);
-    // Enemy side sandbag positions
-    createSandbagWall(-10, -18, 8, 0);
-    createSandbagWall(10, -18, 8, 0);
-    createSandbagWall(0, -35, 6, 0);
-    createSandbagWall(-30, -25, 5, 0.3);
-    createSandbagWall(30, -25, 5, -0.3);
-    // No man's land scattered cover
+    // Communication trenches (connecting front to rear)
+    createTrench(-10, 21, 14, Math.PI / 2);
+    createTrench(10, -27, 16, Math.PI / 2);
+
+    // === SANDBAG FORTIFICATIONS (reduced) ===
+    createSandbagWall(-15, 12, 6, 0);
+    createSandbagWall(15, 12, 6, 0);
+    createSandbagWall(-15, -18, 6, 0);
+    createSandbagWall(15, -18, 6, 0);
+    // No man's land cover
     createSandbagWall(-20, 0, 4, Math.PI / 4);
     createSandbagWall(20, -5, 4, -Math.PI / 4);
 
-    // === BARBED WIRE (no man's land) ===
+    // === BARBED WIRE (reduced) ===
     if (QUALITY !== 'low') {
-        createBarbedWire(-25, 8, 15, 0);
-        createBarbedWire(5, 8, 20, 0);
-        createBarbedWire(30, 8, 12, 0.1);
-        createBarbedWire(-20, -12, 15, 0);
-        createBarbedWire(10, -12, 18, 0);
-        createBarbedWire(35, -10, 10, -0.1);
-        // Random wire tangles in no man's land
-        createBarbedWire(-5, 2, 8, Math.PI / 6);
-        createBarbedWire(15, -3, 6, -Math.PI / 5);
+        createBarbedWire(-15, 8, 20, 0);
+        createBarbedWire(15, 8, 20, 0);
+        createBarbedWire(-10, -12, 18, 0);
+        createBarbedWire(15, -12, 18, 0);
     }
 
-    // === RUINED BUILDINGS (war-torn) ===
+    // === RUINS (reduced from 7 to 4) ===
     createRuin(-40, -15, 8, 8, 3);
     createRuin(40, -10, 6, 10, 2.5);
-    createRuin(-35, 20, 10, 6, 3);
-    createRuin(35, 25, 8, 8, 3.5);
+    createRuin(-35, 22, 8, 6, 3);
     createRuin(0, -50, 10, 8, 4);
-    createRuin(-50, 5, 8, 6, 2);
-    createRuin(50, 0, 6, 8, 3);
-    // A few partially standing buildings far from front lines
+
+    // Standing buildings far from front lines (reduced from 4 to 2)
     createBuilding(-45, 40, 10, 8, 6);
-    createBuilding(45, 40, 8, 10, 5);
-    createBuilding(-45, -50, 8, 8, 6);
     createBuilding(50, -45, 10, 8, 5);
 
-    // One muddy road (supply route behind allied lines)
+    // Supply road
     createRoad(0, 40, S * 1.2, 5);
-    createRoad(-40, 35, 5, 30);
 
-    // === DESTROYED VEHICLES ===
-    createDestroyedTank(-15, 3);   // no man's land
-    createDestroyedTank(20, -5);   // no man's land
-    createDestroyedTank(-40, -30); // behind enemy lines
-    createDestroyedJeep(10, 25);   // behind allied lines
-    createDestroyedJeep(-30, 30);
+    // === DESTROYED VEHICLES (reduced) ===
+    createDestroyedTank(-15, 3);
+    createDestroyedTank(20, -5);
+    createDestroyedJeep(10, 25);
     createDestroyedJeep(35, -35);
 
-    // === SUPPLY CRATES ===
-    for (let i = 0; i < CFG.CRATE_COUNT; i++) {
+    // === SUPPLY CRATES (halved) ===
+    const crateCount = Math.floor(CFG.CRATE_COUNT / 2);
+    for (let i = 0; i < crateCount; i++) {
         const cx = (Math.random() - 0.5) * S * 1.2;
         const cz = (Math.random() - 0.5) * S * 1.2;
         if (!checkCollision(cx, cz, 2)) {
@@ -732,58 +705,42 @@ function createMap() {
         }
     }
 
-    // === FLAG POLES ===
-    createFlagPole(-5, 35);   // allied flag (rear)
-    createFlagPole(5, -35);   // enemy flag (rear)
+    // Flags
+    createFlagPole(-5, 35);
+    createFlagPole(5, -35);
 
-    // Boundary walls (hidden in fog/mountains)
+    // Boundary walls
     const wallH = 4, wallThick = 1;
     createBox(0, -S, S * 2, wallThick, wallH, MAT.concreteDark, true);
     createBox(0, S, S * 2, wallThick, wallH, MAT.concreteDark, true);
     createBox(-S, 0, wallThick, S * 2, wallH, MAT.concreteDark, true);
     createBox(S, 0, wallThick, S * 2, wallH, MAT.concreteDark, true);
 
-    // Dark mountains on horizon
+    // Mountains (fewer segments)
     for (let i = 0; i < CFG.MOUNTAIN_COUNT; i++) {
         const ang = (i / CFG.MOUNTAIN_COUNT) * Math.PI * 2 + (Math.random() - 0.5) * 0.3;
         const dist = 95 + Math.random() * 25;
         const mh = 15 + Math.random() * 25;
-        const geo = new THREE.ConeGeometry(10 + Math.random() * 12, mh, 6);
+        const geo = new THREE.ConeGeometry(10 + Math.random() * 12, mh, 5);
         const mesh = new THREE.Mesh(geo, i % 2 === 0 ? MAT.mountain1 : MAT.mountain2);
         mesh.position.set(Math.cos(ang) * dist, mh / 2 - 3, Math.sin(ang) * dist);
         mesh.rotation.y = Math.random() * Math.PI;
         scene.add(mesh);
     }
 
-    // Grey overcast sky dome
+    // Sky dome
     createSky();
 
-    // === FIRES AND SMOKE — heavy battlefield atmosphere ===
-    // Burning ruins
+    // === FIRES AND SMOKE (reduced — 4 fires, 3 smoke) ===
     createFire(-40, 0.5, -15);
     createFire(40, 0.5, -10);
-    createFire(-35, 0.5, 20);
-    createFire(35, 0.5, 25);
-    createFire(0, 0.5, -50);
-    // Burning vehicles in no man's land
     createFire(-15, 0.8, 3);
     createFire(20, 0.8, -5);
-    // Random ground fires
-    createFire(-25, 0.3, -8);
-    createFire(30, 0.3, 5);
-    createFire(5, 0.3, -2);
 
-    // Smoke columns rising from fires and battle damage
     if (QUALITY !== 'low') {
         spawnAmbientSmoke(-40, 2, -15);
-        spawnAmbientSmoke(40, 2, -10);
         spawnAmbientSmoke(-15, 2, 3);
         spawnAmbientSmoke(20, 2, -5);
-        spawnAmbientSmoke(-35, 2, 20);
-        spawnAmbientSmoke(0, 2, -50);
-        spawnAmbientSmoke(5, 1, -2);
-        spawnAmbientSmoke(-25, 1, -8);
-        spawnAmbientSmoke(30, 1, 5);
     }
 }
 
@@ -989,8 +946,8 @@ function createRuin(x, z, w, d, h) {
     createBox(x, z + d / 2, w, 0.4, h, wallMat, true);
     createBox(x - w / 2, z, 0.4, d, h + Math.random(), wallMat, true);
 
-    // Rubble pile
-    for (let i = 0; i < 8; i++) {
+    // Rubble pile (reduced)
+    for (let i = 0; i < 4; i++) {
         const rx = x + (Math.random() - 0.5) * w;
         const rz = z + (Math.random() - 0.5) * d;
         const rs = 0.2 + Math.random() * 0.5;
@@ -1008,17 +965,14 @@ function createRuin(x, z, w, d, h) {
 
 function createSandbagWall(x, z, length, angle) {
     const group = new THREE.Group();
-    const rows = 3;
-    for (let row = 0; row < rows; row++) {
-        const count = Math.floor(length / 0.8);
-        for (let i = 0; i < count; i++) {
-            const bag = new THREE.Mesh(_sandbagGeo, MAT.sandbag);
-            bag.position.set((i - count / 2) * 0.75, 0.15 + row * 0.3, (row % 2) * 0.05);
-            bag.rotation.y = (Math.random() - 0.5) * 0.1;
-            bag.castShadow = true;
-            bag.receiveShadow = true;
-            group.add(bag);
-        }
+    // Single box per row instead of individual sandbags — 3 rows = 3 meshes
+    for (let row = 0; row < 3; row++) {
+        const wallGeo = new THREE.BoxGeometry(length, 0.3, 0.4);
+        const wall = new THREE.Mesh(wallGeo, MAT.sandbag);
+        wall.position.set(0, 0.15 + row * 0.3, (row % 2) * 0.05);
+        wall.castShadow = true;
+        wall.receiveShadow = true;
+        group.add(wall);
     }
     group.position.set(x, 0, z);
     group.rotation.y = angle;
@@ -1044,45 +998,29 @@ function createTrench(x, z, length, angle) {
     floor.position.set(0, -trenchD, 0);
     group.add(floor);
 
-    // Duckboards (wooden planks on trench floor)
-    for (let i = -length / 2 + 1; i < length / 2; i += 1.2) {
-        const plank = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.06, trenchW * 0.8), MAT.woodDark);
-        plank.position.set(i, -trenchD + 0.13, 0);
-        group.add(plank);
-    }
+    // Duckboard — single long plank strip instead of many individual planks
+    const duckboard = new THREE.Mesh(new THREE.BoxGeometry(length * 0.9, 0.06, trenchW * 0.7), MAT.woodDark);
+    duckboard.position.set(0, -trenchD + 0.13, 0);
+    group.add(duckboard);
 
-    // Sandbag parapet on top edges
-    for (let i = -length / 2 + 0.4; i < length / 2; i += 0.8) {
-        // Front parapet
-        const bag1 = new THREE.Mesh(_sandbagGeo, MAT.sandbag);
-        bag1.position.set(i, 0.15, -trenchW / 2 - 0.2);
-        bag1.rotation.y = (Math.random() - 0.5) * 0.15;
-        group.add(bag1);
-        // Rear parapet
-        const bag2 = new THREE.Mesh(_sandbagGeo, MAT.sandbag);
-        bag2.position.set(i, 0.15, trenchW / 2 + 0.2);
-        bag2.rotation.y = (Math.random() - 0.5) * 0.15;
-        group.add(bag2);
-    }
+    // Sandbag parapets — single long box per side instead of individual sandbags
+    const parapetGeo = new THREE.BoxGeometry(length, 0.35, 0.5);
+    const p1 = new THREE.Mesh(parapetGeo, MAT.sandbag);
+    p1.position.set(0, 0.17, -trenchW / 2 - 0.2);
+    group.add(p1);
+    const p2 = new THREE.Mesh(parapetGeo, MAT.sandbag);
+    p2.position.set(0, 0.17, trenchW / 2 + 0.2);
+    group.add(p2);
 
-    // Wooden support posts along the walls
+    // A few support posts (sparse)
     const postGeo = new THREE.BoxGeometry(0.1, trenchD, 0.1);
-    for (let i = -length / 2 + 2; i < length / 2; i += 4) {
-        const p1 = new THREE.Mesh(postGeo, MAT.woodDark);
-        p1.position.set(i, -trenchD / 2, -trenchW / 2 + 0.15);
-        group.add(p1);
-        const p2 = new THREE.Mesh(postGeo, MAT.woodDark);
-        p2.position.set(i, -trenchD / 2, trenchW / 2 - 0.15);
-        group.add(p2);
-    }
-
-    // Mud puddles on floor
-    for (let i = -length / 2 + 3; i < length / 2; i += 5 + Math.random() * 3) {
-        const pudGeo = new THREE.CircleGeometry(0.4 + Math.random() * 0.3, 6);
-        const pud = new THREE.Mesh(pudGeo, MAT.mudWet);
-        pud.rotation.x = -Math.PI / 2;
-        pud.position.set(i, -trenchD + 0.14, (Math.random() - 0.5) * trenchW * 0.5);
-        group.add(pud);
+    for (let i = -length / 2 + 4; i < length / 2; i += 8) {
+        const post1 = new THREE.Mesh(postGeo, MAT.woodDark);
+        post1.position.set(i, -trenchD / 2, -trenchW / 2 + 0.15);
+        group.add(post1);
+        const post2 = new THREE.Mesh(postGeo, MAT.woodDark);
+        post2.position.set(i, -trenchD / 2, trenchW / 2 - 0.15);
+        group.add(post2);
     }
 
     group.position.set(x, 0, z);
@@ -2147,8 +2085,8 @@ function createAeroplane() {
         vz: (Math.random() - 0.5) * 3,
         endX,
         alive: true,
-        nextBomb: performance.now() + 1000 + Math.random() * 3000,
-        bombsLeft: 2 + Math.floor(Math.random() * 3),
+        nextBomb: performance.now() + 1500 + Math.random() * 3000,
+        bombsLeft: 1 + Math.floor(Math.random() * 2),
         propMat,
     };
 }
@@ -2174,8 +2112,6 @@ function updateAeroplanes(dt) {
                 scene.remove(b.mesh);
 
                 spawnExplosion(bx, 1, bz);
-                spawnExplosion(bx + 1, 0.5, bz + 1);
-                spawnExplosion(bx - 1, 0.8, bz - 1);
                 playSound('explosion', 1.0);
 
                 // Camera shake if player is close
@@ -2293,10 +2229,8 @@ function updateAeroplanes(dt) {
 }
 
 function spawnAeroplaneWave() {
-    const count = 1 + Math.floor(Math.random() * 2); // 1-2 planes
-    for (let i = 0; i < count; i++) {
-        aeroplanes.push(createAeroplane());
-    }
+    if (aeroplanes.length >= 2) return; // cap active planes
+    aeroplanes.push(createAeroplane());
 }
 
 // ---- ALLY SPAWNING ----
