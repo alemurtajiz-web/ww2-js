@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Dogs of War - WW2 FPS</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -472,6 +472,171 @@
             font-weight: bold;
             color: #5ea04a;
         }
+
+        /* ---- TOUCH CONTROLS ---- */
+        #touchControls {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 100;
+            pointer-events: none;
+        }
+        #touchControls > * {
+            position: fixed;
+            z-index: 1000;
+            pointer-events: auto;
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            font-weight: bold;
+            color: rgba(255,255,255,0.85);
+            text-shadow: 1px 1px 2px #000;
+        }
+
+        /* Move stick */
+        #moveStick {
+            width: 120px; height: 120px;
+            left: 20px; bottom: 20px;
+            background: rgba(255,255,255,0.08);
+            border: 2px solid rgba(255,255,255,0.2);
+        }
+        #moveStickKnob {
+            width: 50px; height: 50px;
+            background: rgba(255,255,255,0.25);
+            border: 2px solid rgba(255,255,255,0.4);
+            border-radius: 50%;
+            position: absolute;
+            pointer-events: none;
+            transition: none;
+        }
+        #moveStick.active {
+            border-color: rgba(255,255,255,0.45);
+        }
+
+        /* Shoot button */
+        #shootBtn {
+            width: 70px; height: 70px;
+            right: 20px; bottom: 80px;
+            background: rgba(220,40,40,0.45);
+            border: 2px solid rgba(255,80,80,0.6);
+            font-size: 11px;
+            letter-spacing: 1px;
+        }
+        #shootBtn:active, #shootBtn.active {
+            background: rgba(255,50,50,0.7);
+        }
+
+        /* ADS button */
+        #adsBtn {
+            width: 50px; height: 50px;
+            left: 20px; bottom: 220px;
+            background: rgba(255,255,255,0.1);
+            border: 2px solid rgba(255,255,255,0.25);
+            font-size: 10px;
+        }
+        #adsBtn:active, #adsBtn.active {
+            background: rgba(255,255,255,0.3);
+        }
+
+        /* Reload button */
+        #reloadBtn {
+            width: 50px; height: 50px;
+            right: 100px; bottom: 20px;
+            background: rgba(255,255,255,0.1);
+            border: 2px solid rgba(255,255,255,0.25);
+            font-size: 9px;
+            letter-spacing: 1px;
+        }
+
+        /* Jump button */
+        #jumpBtn {
+            width: 50px; height: 50px;
+            right: 180px; bottom: 20px;
+            background: rgba(255,255,255,0.1);
+            border: 2px solid rgba(255,255,255,0.25);
+            font-size: 10px;
+        }
+
+        /* Sprint button */
+        #sprintBtn {
+            width: 50px; height: 50px;
+            left: 150px; bottom: 20px;
+            background: rgba(255,255,255,0.1);
+            border: 2px solid rgba(255,255,255,0.25);
+            font-size: 9px;
+            letter-spacing: 1px;
+        }
+        #sprintBtn.active {
+            background: rgba(255,200,50,0.3);
+            border-color: rgba(255,200,50,0.5);
+        }
+
+        /* Grenade button */
+        #grenadeBtn {
+            width: 50px; height: 50px;
+            right: 20px; bottom: 200px;
+            background: rgba(255,180,40,0.15);
+            border: 2px solid rgba(255,180,40,0.35);
+            font-size: 10px;
+        }
+
+        /* Weapon buttons */
+        #weaponBtns {
+            position: fixed;
+            right: 20px; bottom: 280px;
+            z-index: 1000;
+            pointer-events: auto;
+            touch-action: none;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .weapon-btn {
+            width: 40px; height: 40px;
+            background: rgba(255,255,255,0.1);
+            border: 2px solid rgba(255,255,255,0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Courier New', monospace;
+            font-size: 16px;
+            font-weight: bold;
+            color: rgba(255,255,255,0.8);
+            text-shadow: 1px 1px 2px #000;
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        .weapon-btn.active {
+            background: rgba(212,160,23,0.35);
+            border-color: rgba(212,160,23,0.6);
+        }
+
+        /* Look area (invisible, covers right half) */
+        #lookArea {
+            position: fixed;
+            top: 0;
+            right: 0;
+            width: 50%;
+            height: 100%;
+            z-index: 999;
+            pointer-events: auto;
+            touch-action: none;
+            border-radius: 0;
+        }
+
+        /* Touch-specific overrides */
+        .touch-device #clickToPlay { display: none !important; }
+        .touch-device #weaponHint { display: none !important; }
+        .touch-device .hud-block-label { font-size: 11px; }
+        .touch-device .ammo-text { font-size: 30px; }
+        .touch-device .score-val { font-size: 30px; }
     </style>
 </head>
 <body>
@@ -578,6 +743,24 @@
     <div class="stats">Score: <span id="finalScore">0</span></div>
     <div class="stats2">Wave <span id="finalWave">1</span> | Kills: <span id="finalKills">0</span></div>
     <button id="restartBtn">FIGHT AGAIN</button>
+</div>
+
+<!-- Touch Controls (hidden on desktop) -->
+<div id="touchControls">
+    <div id="lookArea"></div>
+    <div id="moveStick"><div id="moveStickKnob"></div></div>
+    <div id="shootBtn">FIRE</div>
+    <div id="adsBtn">ADS</div>
+    <div id="reloadBtn">RLD</div>
+    <div id="jumpBtn">JMP</div>
+    <div id="sprintBtn">RUN</div>
+    <div id="grenadeBtn">GRN</div>
+    <div id="weaponBtns">
+        <div class="weapon-btn" data-idx="0">1</div>
+        <div class="weapon-btn" data-idx="1">2</div>
+        <div class="weapon-btn" data-idx="2">3</div>
+        <div class="weapon-btn" data-idx="3">4</div>
+    </div>
 </div>
 
 <!-- Three.js -->

@@ -29,6 +29,9 @@ function detectQuality() {
 const QUALITY = detectQuality();
 console.log('[DogsOfWar] Quality level:', QUALITY);
 
+// ---- TOUCH DETECTION ----
+const IS_TOUCH = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+
 // ---- CONFIG ----
 const CFG = {
     PLAYER_HEIGHT: 1.7,
@@ -37,6 +40,7 @@ const CFG = {
     JUMP_FORCE: 6,
     GRAVITY: -18,
     MOUSE_SENS: 0.002,
+    TOUCH_SENS: 0.005,
     PLAYER_HP: 100,
 
     WEAPONS: [
@@ -238,9 +242,41 @@ const _dir = new THREE.Vector3();
 // ---- AUDIO SYSTEM ----
 const AudioCtx = window.AudioContext || window.webkitAudioContext;
 let audioCtx = null;
+const _soundBufs = {};
 
 function initAudio() {
     audioCtx = new AudioCtx();
+    _initSoundBuffers();
+}
+
+function _initSoundBuffers() {
+    // Pre-create noise buffers once instead of every playSound() call
+    const sr = audioCtx.sampleRate;
+
+    // Shoot noise (0.08s)
+    const shootLen = Math.floor(sr * 0.08);
+    _soundBufs.shoot = audioCtx.createBuffer(1, shootLen, sr);
+    { const d = _soundBufs.shoot.getChannelData(0); for (let i = 0; i < shootLen; i++) { const t = i / shootLen; d[i] = (Math.random() * 2 - 1) * Math.exp(-t * 30) * 0.6; } }
+
+    // Impact noise (0.04s)
+    const impactLen = Math.floor(sr * 0.04);
+    _soundBufs.impact = audioCtx.createBuffer(1, impactLen, sr);
+    { const d = _soundBufs.impact.getChannelData(0); for (let i = 0; i < impactLen; i++) { d[i] = (Math.random() * 2 - 1) * Math.exp(-(i / impactLen) * 20) * 0.3; } }
+
+    // Explosion noise (0.3s)
+    const exploLen = Math.floor(sr * 0.3);
+    _soundBufs.explosion = audioCtx.createBuffer(1, exploLen, sr);
+    { const d = _soundBufs.explosion.getChannelData(0); for (let i = 0; i < exploLen; i++) { const t = i / exploLen; d[i] = (Math.random() * 2 - 1) * Math.exp(-t * 8) * 0.8; } }
+
+    // Footstep noise (0.05s)
+    const footLen = Math.floor(sr * 0.05);
+    _soundBufs.footstep = audioCtx.createBuffer(1, footLen, sr);
+    { const d = _soundBufs.footstep.getChannelData(0); for (let i = 0; i < footLen; i++) { const t = i / footLen; d[i] = (Math.random() * 2 - 1) * Math.exp(-t * 40) * 0.2; } }
+
+    // Enemy shoot noise (0.06s)
+    const enemyLen = Math.floor(sr * 0.06);
+    _soundBufs.enemyShoot = audioCtx.createBuffer(1, enemyLen, sr);
+    { const d = _soundBufs.enemyShoot.getChannelData(0); for (let i = 0; i < enemyLen; i++) { d[i] = (Math.random() * 2 - 1) * Math.exp(-(i / enemyLen) * 25) * 0.4; } }
 }
 
 function playSound(type, volume, x, y, z) {
@@ -250,16 +286,8 @@ function playSound(type, volume, x, y, z) {
     const now = audioCtx.currentTime;
 
     if (type === 'shoot') {
-        // Gunshot: noise burst + low thump
-        const bufLen = audioCtx.sampleRate * 0.08;
-        const buf = audioCtx.createBuffer(1, bufLen, audioCtx.sampleRate);
-        const data = buf.getChannelData(0);
-        for (let i = 0; i < bufLen; i++) {
-            const t = i / bufLen;
-            data[i] = (Math.random() * 2 - 1) * Math.exp(-t * 30) * 0.6;
-        }
         const src = audioCtx.createBufferSource();
-        src.buffer = buf;
+        src.buffer = _soundBufs.shoot;
 
         const filter = audioCtx.createBiquadFilter();
         filter.type = 'lowpass';
@@ -289,14 +317,8 @@ function playSound(type, volume, x, y, z) {
         osc.stop(now + 0.12);
     }
     else if (type === 'impact') {
-        const bufLen = audioCtx.sampleRate * 0.04;
-        const buf = audioCtx.createBuffer(1, bufLen, audioCtx.sampleRate);
-        const data = buf.getChannelData(0);
-        for (let i = 0; i < bufLen; i++) {
-            data[i] = (Math.random() * 2 - 1) * Math.exp(-(i / bufLen) * 20) * 0.3;
-        }
         const src = audioCtx.createBufferSource();
-        src.buffer = buf;
+        src.buffer = _soundBufs.impact;
         const gain = audioCtx.createGain();
         gain.gain.setValueAtTime(volume * 0.15, now);
         gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
@@ -306,15 +328,8 @@ function playSound(type, volume, x, y, z) {
         src.stop(now + 0.05);
     }
     else if (type === 'explosion') {
-        const bufLen = audioCtx.sampleRate * 0.3;
-        const buf = audioCtx.createBuffer(1, bufLen, audioCtx.sampleRate);
-        const data = buf.getChannelData(0);
-        for (let i = 0; i < bufLen; i++) {
-            const t = i / bufLen;
-            data[i] = (Math.random() * 2 - 1) * Math.exp(-t * 8) * 0.8;
-        }
         const src = audioCtx.createBufferSource();
-        src.buffer = buf;
+        src.buffer = _soundBufs.explosion;
         const filter = audioCtx.createBiquadFilter();
         filter.type = 'lowpass';
         filter.frequency.value = 800;
@@ -328,15 +343,8 @@ function playSound(type, volume, x, y, z) {
         src.stop(now + 0.4);
     }
     else if (type === 'footstep') {
-        const bufLen = audioCtx.sampleRate * 0.05;
-        const buf = audioCtx.createBuffer(1, bufLen, audioCtx.sampleRate);
-        const data = buf.getChannelData(0);
-        for (let i = 0; i < bufLen; i++) {
-            const t = i / bufLen;
-            data[i] = (Math.random() * 2 - 1) * Math.exp(-t * 40) * 0.2;
-        }
         const src = audioCtx.createBufferSource();
-        src.buffer = buf;
+        src.buffer = _soundBufs.footstep;
         const filter = audioCtx.createBiquadFilter();
         filter.type = 'lowpass';
         filter.frequency.value = 400 + Math.random() * 200;
@@ -364,14 +372,8 @@ function playSound(type, volume, x, y, z) {
         osc.stop(now + 0.06);
     }
     else if (type === 'enemyShoot') {
-        const bufLen = audioCtx.sampleRate * 0.06;
-        const buf = audioCtx.createBuffer(1, bufLen, audioCtx.sampleRate);
-        const data = buf.getChannelData(0);
-        for (let i = 0; i < bufLen; i++) {
-            data[i] = (Math.random() * 2 - 1) * Math.exp(-(i / bufLen) * 25) * 0.4;
-        }
         const src = audioCtx.createBufferSource();
-        src.buffer = buf;
+        src.buffer = _soundBufs.enemyShoot;
         const filter = audioCtx.createBiquadFilter();
         filter.type = 'lowpass';
         filter.frequency.value = 1500;
@@ -879,45 +881,46 @@ function createBuilding(x, z, w, d, h) {
     const roofGeo = new THREE.BoxGeometry(w + 1.2, 0.5, d + 1.2);
     const roof = new THREE.Mesh(roofGeo, MAT.roof);
     roof.position.set(x, h + 0.25, z);
-    roof.castShadow = true;
     scene.add(roof);
 
     // Chimney on some buildings
     if (Math.random() > 0.4) {
-        const chimGeo = new THREE.BoxGeometry(0.8, 2.5, 0.8);
-        const chim = new THREE.Mesh(chimGeo, MAT.brickDark);
+        if (!createBuilding._chimGeo) createBuilding._chimGeo = new THREE.BoxGeometry(0.8, 2.5, 0.8);
+        const chim = new THREE.Mesh(createBuilding._chimGeo, MAT.brickDark);
         chim.position.set(x + w * 0.3, h + 1.5, z + d * 0.3);
-        chim.castShadow = true;
         scene.add(chim);
     }
 
-    // Windows with frames
+    // Windows with frames (pooled geometries)
     const winSize = 1.2;
+    if (!createBuilding._winGeoFront) {
+        createBuilding._winGeoFront = new THREE.BoxGeometry(winSize, winSize * 1.3, 0.15);
+        createBuilding._winGeoSide = new THREE.BoxGeometry(0.15, winSize * 1.3, winSize);
+        createBuilding._frameGeoFront = new THREE.BoxGeometry(winSize + 0.15, winSize * 1.3 + 0.15, 0.06);
+        createBuilding._frameGeoSide = new THREE.BoxGeometry(0.06, winSize * 1.3 + 0.15, winSize + 0.15);
+    }
     for (let side = 0; side < 4; side++) {
-        let wx, wz, ww, wd;
+        let wx, wz;
         const winH = h * 0.6;
-        if (side === 0) { wx = x; wz = z - d / 2 - 0.01; ww = winSize; wd = 0.1; }
-        else if (side === 1) { wx = x; wz = z + d / 2 + 0.01; ww = winSize; wd = 0.1; }
-        else if (side === 2) { wx = x - w / 2 - 0.01; wz = z; ww = 0.1; wd = winSize; }
-        else { wx = x + w / 2 + 0.01; wz = z; ww = 0.1; wd = winSize; }
+        if (side === 0) { wx = x; wz = z - d / 2 - 0.01; }
+        else if (side === 1) { wx = x; wz = z + d / 2 + 0.01; }
+        else if (side === 2) { wx = x - w / 2 - 0.01; wz = z; }
+        else { wx = x + w / 2 + 0.01; wz = z; }
 
-        const spacing = side < 2 ? w : d;
+        const isFront = side < 2;
+        const spacing = isFront ? w : d;
         const count = Math.floor(spacing / 4);
+        const winGeo = isFront ? createBuilding._winGeoFront : createBuilding._winGeoSide;
+        const frameGeo = isFront ? createBuilding._frameGeoFront : createBuilding._frameGeoSide;
         for (let i = 0; i < count; i++) {
             const offset = (i - (count - 1) / 2) * 3.5;
-            // Window glass
-            const wg = new THREE.BoxGeometry(ww > 0.1 ? winSize : 0.15, winSize * 1.3, wd > 0.1 ? winSize : 0.15);
-            const wm = new THREE.Mesh(wg, MAT.window);
-            wm.position.set(wx + (side < 2 ? offset : 0), winH, wz + (side >= 2 ? offset : 0));
+            const px = wx + (isFront ? offset : 0);
+            const pz = wz + (isFront ? 0 : offset);
+            const wm = new THREE.Mesh(winGeo, MAT.window);
+            wm.position.set(px, winH, pz);
             scene.add(wm);
-            // Window frame (wood border)
-            const frameThick = 0.06;
-            const fw = ww > 0.1 ? winSize + 0.15 : frameThick;
-            const fh = winSize * 1.3 + 0.15;
-            const fd = wd > 0.1 ? winSize + 0.15 : frameThick;
-            const frameGeo = new THREE.BoxGeometry(fw, fh, fd);
             const frame = new THREE.Mesh(frameGeo, MAT.woodDark);
-            frame.position.set(wx + (side < 2 ? offset : 0), winH, wz + (side >= 2 ? offset : 0));
+            frame.position.set(px, winH, pz);
             scene.add(frame);
         }
     }
@@ -927,13 +930,13 @@ function createBuilding(x, z, w, d, h) {
     door.position.set(x, 1.25, z - d / 2 - 0.01);
     scene.add(door);
     // Door frame
-    const dfGeo = new THREE.BoxGeometry(1.7, 2.7, 0.08);
-    const df = new THREE.Mesh(dfGeo, MAT.woodDark);
+    if (!createBuilding._dfGeo) createBuilding._dfGeo = new THREE.BoxGeometry(1.7, 2.7, 0.08);
+    const df = new THREE.Mesh(createBuilding._dfGeo, MAT.woodDark);
     df.position.set(x, 1.35, z - d / 2 - 0.04);
     scene.add(df);
 
     // Foundation strip
-    const foundGeo = new THREE.BoxGeometry(w + 0.2, 0.3, d + 0.2);
+    const foundGeo = new THREE.BoxGeometry(w + 0.2, 0.3, d + 0.2); // size varies per building
     const found = new THREE.Mesh(foundGeo, MAT.concreteDark);
     found.position.set(x, 0.15, z);
     found.receiveShadow = true;
@@ -956,8 +959,8 @@ function createRuin(x, z, w, d, h) {
     }
 
     // Scorched ground under ruins
-    const scorchGeo = new THREE.CircleGeometry(Math.max(w, d) * 0.6, 8);
-    const scorch = new THREE.Mesh(scorchGeo, MAT.scorch);
+    if (!createRuin._scorchGeo) createRuin._scorchGeo = new THREE.CircleGeometry(3, 8);
+    const scorch = new THREE.Mesh(createRuin._scorchGeo, MAT.scorch);
     scorch.rotation.x = -Math.PI / 2;
     scorch.position.set(x, 0.025, z);
     scene.add(scorch);
@@ -1166,6 +1169,12 @@ const keys = {};
 let mouseDown = false;
 let pointerLocked = false;
 
+// ---- TOUCH STATE ----
+let touchMoveX = 0, touchMoveY = 0;
+let touchShootDown = false;
+let touchSprint = false;
+const _touches = {}; // identifier → { startX, startY, lastX, lastY, type }
+
 function setupInput() {
     addListener(document, 'keydown', e => {
         keys[e.code] = true;
@@ -1201,6 +1210,7 @@ function setupInput() {
     });
 
     addListener(document, 'pointerlockchange', () => {
+        if (IS_TOUCH) return; // touch devices ignore pointer lock
         pointerLocked = !!document.pointerLockElement;
         if (!pointerLocked && gameRunning) {
             DOM.clickToPlay.style.display = 'flex';
@@ -1209,8 +1219,199 @@ function setupInput() {
         }
     });
 
-    addListener(DOM.clickToPlay, 'click', () => {
-        renderer.domElement.requestPointerLock();
+    if (!IS_TOUCH) {
+        addListener(DOM.clickToPlay, 'click', () => {
+            renderer.domElement.requestPointerLock();
+        });
+    }
+
+    // Setup touch controls if on touch device
+    if (IS_TOUCH) {
+        document.body.classList.add('touch-device');
+        pointerLocked = true; // always treat as "unlocked but playable"
+        setupTouchInput();
+    }
+}
+
+function setupTouchInput() {
+    const touchControls = document.getElementById('touchControls');
+    const moveStick = document.getElementById('moveStick');
+    const moveStickKnob = document.getElementById('moveStickKnob');
+    const shootBtn = document.getElementById('shootBtn');
+    const adsBtn = document.getElementById('adsBtn');
+    const reloadBtn = document.getElementById('reloadBtn');
+    const jumpBtn = document.getElementById('jumpBtn');
+    const sprintBtn = document.getElementById('sprintBtn');
+    const grenadeBtn = document.getElementById('grenadeBtn');
+    const lookArea = document.getElementById('lookArea');
+    const weaponBtns = document.querySelectorAll('.weapon-btn');
+
+    touchControls.style.display = 'block';
+
+    // Prevent default on all touch elements to stop iOS scrolling/zooming
+    const preventDef = e => e.preventDefault();
+    addListener(document.body, 'touchmove', preventDef, { passive: false });
+    addListener(renderer.domElement, 'touchstart', preventDef, { passive: false });
+
+    // ---- LEFT JOYSTICK ----
+    const stickRect = () => moveStick.getBoundingClientRect();
+    const STICK_RADIUS = 35; // max knob offset from center
+
+    addListener(moveStick, 'touchstart', e => {
+        e.preventDefault();
+        const touch = e.changedTouches[0];
+        _touches[touch.identifier] = { type: 'stick', startX: touch.clientX, startY: touch.clientY };
+        moveStick.classList.add('active');
+    }, { passive: false });
+
+    addListener(moveStick, 'touchmove', e => {
+        e.preventDefault();
+        for (let i = 0; i < e.changedTouches.length; i++) {
+            const touch = e.changedTouches[i];
+            const t = _touches[touch.identifier];
+            if (!t || t.type !== 'stick') continue;
+
+            const rect = stickRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+            let dx = touch.clientX - centerX;
+            let dy = touch.clientY - centerY;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+
+            if (dist > STICK_RADIUS) {
+                dx = (dx / dist) * STICK_RADIUS;
+                dy = (dy / dist) * STICK_RADIUS;
+            }
+
+            // Normalize to -1..1
+            touchMoveX = dx / STICK_RADIUS;
+            touchMoveY = dy / STICK_RADIUS;
+
+            // Visual feedback: move knob
+            moveStickKnob.style.transform = `translate(${dx}px, ${dy}px)`;
+        }
+    }, { passive: false });
+
+    const resetStick = e => {
+        e.preventDefault();
+        for (let i = 0; i < e.changedTouches.length; i++) {
+            const touch = e.changedTouches[i];
+            const t = _touches[touch.identifier];
+            if (t && t.type === 'stick') {
+                touchMoveX = 0;
+                touchMoveY = 0;
+                moveStickKnob.style.transform = 'translate(0px, 0px)';
+                moveStick.classList.remove('active');
+                delete _touches[touch.identifier];
+            }
+        }
+    };
+    addListener(moveStick, 'touchend', resetStick, { passive: false });
+    addListener(moveStick, 'touchcancel', resetStick, { passive: false });
+
+    // ---- RIGHT SIDE LOOK AREA ----
+    addListener(lookArea, 'touchstart', e => {
+        e.preventDefault();
+        for (let i = 0; i < e.changedTouches.length; i++) {
+            const touch = e.changedTouches[i];
+            _touches[touch.identifier] = { type: 'look', lastX: touch.clientX, lastY: touch.clientY };
+        }
+    }, { passive: false });
+
+    addListener(lookArea, 'touchmove', e => {
+        e.preventDefault();
+        if (!gameRunning || !player || !player.alive) return;
+        for (let i = 0; i < e.changedTouches.length; i++) {
+            const touch = e.changedTouches[i];
+            const t = _touches[touch.identifier];
+            if (!t || t.type !== 'look') continue;
+
+            const dx = touch.clientX - t.lastX;
+            const dy = touch.clientY - t.lastY;
+            t.lastX = touch.clientX;
+            t.lastY = touch.clientY;
+
+            const sens = scoped ? CFG.TOUCH_SENS * 0.35 : CFG.TOUCH_SENS;
+            player.yaw -= dx * sens;
+            player.pitch -= dy * sens;
+            player.pitch = Math.max(-Math.PI / 2 + 0.05, Math.min(Math.PI / 2 - 0.05, player.pitch));
+        }
+    }, { passive: false });
+
+    const endLook = e => {
+        e.preventDefault();
+        for (let i = 0; i < e.changedTouches.length; i++) {
+            const touch = e.changedTouches[i];
+            if (_touches[touch.identifier] && _touches[touch.identifier].type === 'look') {
+                delete _touches[touch.identifier];
+            }
+        }
+    };
+    addListener(lookArea, 'touchend', endLook, { passive: false });
+    addListener(lookArea, 'touchcancel', endLook, { passive: false });
+
+    // ---- SHOOT BUTTON ----
+    addListener(shootBtn, 'touchstart', e => {
+        e.preventDefault();
+        touchShootDown = true;
+        shootBtn.classList.add('active');
+        if (gameRunning && player && player.alive) {
+            const w = player.weapons[player.weaponIndex];
+            if (!w.auto) shoot();
+        }
+    }, { passive: false });
+    const endShoot = e => { e.preventDefault(); touchShootDown = false; shootBtn.classList.remove('active'); };
+    addListener(shootBtn, 'touchend', endShoot, { passive: false });
+    addListener(shootBtn, 'touchcancel', endShoot, { passive: false });
+
+    // ---- ADS BUTTON ----
+    addListener(adsBtn, 'touchstart', e => {
+        e.preventDefault();
+        adsBtn.classList.add('active');
+        if (gameRunning && player && player.alive) toggleScope(true);
+    }, { passive: false });
+    const endAds = e => { e.preventDefault(); adsBtn.classList.remove('active'); toggleScope(false); };
+    addListener(adsBtn, 'touchend', endAds, { passive: false });
+    addListener(adsBtn, 'touchcancel', endAds, { passive: false });
+
+    // ---- RELOAD BUTTON ----
+    addListener(reloadBtn, 'touchstart', e => {
+        e.preventDefault();
+        if (gameRunning && player && player.alive) reload();
+    }, { passive: false });
+
+    // ---- JUMP BUTTON ----
+    addListener(jumpBtn, 'touchstart', e => {
+        e.preventDefault();
+        keys['KeyV'] = true;
+    }, { passive: false });
+    const endJump = e => { e.preventDefault(); keys['KeyV'] = false; };
+    addListener(jumpBtn, 'touchend', endJump, { passive: false });
+    addListener(jumpBtn, 'touchcancel', endJump, { passive: false });
+
+    // ---- SPRINT BUTTON ----
+    addListener(sprintBtn, 'touchstart', e => {
+        e.preventDefault();
+        touchSprint = true;
+        sprintBtn.classList.add('active');
+    }, { passive: false });
+    const endSprint = e => { e.preventDefault(); touchSprint = false; sprintBtn.classList.remove('active'); };
+    addListener(sprintBtn, 'touchend', endSprint, { passive: false });
+    addListener(sprintBtn, 'touchcancel', endSprint, { passive: false });
+
+    // ---- GRENADE BUTTON ----
+    addListener(grenadeBtn, 'touchstart', e => {
+        e.preventDefault();
+        if (gameRunning && player && player.alive) throwGrenade();
+    }, { passive: false });
+
+    // ---- WEAPON SWITCH BUTTONS ----
+    weaponBtns.forEach(btn => {
+        addListener(btn, 'touchstart', e => {
+            e.preventDefault();
+            const idx = parseInt(btn.getAttribute('data-idx'));
+            if (gameRunning && player && player.alive) switchWeapon(idx);
+        }, { passive: false });
     });
 }
 
@@ -1550,7 +1751,7 @@ function spawnImpact(x, y, z, color) {
 }
 
 function spawnExplosion(x, y, z) {
-    const count = Math.min(14, CFG.MAX_PARTICLES - particles.length);
+    const count = Math.min(8, CFG.MAX_PARTICLES - particles.length);
     const colors = [0xff4422, 0xff8844, 0xffcc44, 0x888888, 0x555555];
     for (let i = 0; i < count; i++) {
         const mesh = new THREE.Mesh(POOL.particleGeo, getParticleMat(colors[i % 5]));
@@ -1589,32 +1790,32 @@ function createEnemy(x, z, type) {
     group.add(belt);
 
     const head = new THREE.Mesh(POOL.enemyHeadGeo, MAT.enemyHead);
-    head.position.y = 1.8; head.castShadow = true;
+    head.position.y = 1.8;
     group.add(head);
 
     // Stahlhelm
     const helmet = new THREE.Mesh(POOL.enemyHelmetGeo, MAT.helmet);
-    helmet.position.y = 1.85; helmet.castShadow = true;
+    helmet.position.y = 1.85;
     group.add(helmet);
 
     // Legs (pants in darker Feldgrau)
     for (const sx of [-0.15, 0.15]) {
         const leg = new THREE.Mesh(POOL.enemyLegGeo, pantsMat);
-        leg.position.set(sx, 0.35, 0); leg.castShadow = true;
+        leg.position.set(sx, 0.35, 0);
         group.add(leg);
     }
 
     // Marching boots (Marschstiefel)
     for (const sx of [-0.15, 0.15]) {
         const boot = new THREE.Mesh(POOL.enemyBootGeo, POOL.enemyBootMat);
-        boot.position.set(sx, 0.05, 0.02); boot.castShadow = true;
+        boot.position.set(sx, 0.05, 0.02);
         group.add(boot);
     }
 
     // Arms (tunic sleeves)
     for (const sx of [-0.4, 0.4]) {
         const arm = new THREE.Mesh(POOL.enemyArmGeo, tunicMat);
-        arm.position.set(sx, 1.1, 0); arm.castShadow = true;
+        arm.position.set(sx, 1.1, 0);
         group.add(arm);
     }
 
@@ -1670,32 +1871,32 @@ function createAlly(x, z, role) {
 
     // Head
     const head = new THREE.Mesh(POOL.enemyHeadGeo, MAT.enemyHead);
-    head.position.y = 1.8; head.castShadow = true;
+    head.position.y = 1.8;
     group.add(head);
 
     // M1 Helmet (olive)
     const helmet = new THREE.Mesh(POOL.enemyHelmetGeo, MAT.allyHelmet);
-    helmet.position.y = 1.85; helmet.castShadow = true;
+    helmet.position.y = 1.85;
     group.add(helmet);
 
     // Legs — children index 5, 6
     for (const sx of [-0.15, 0.15]) {
         const leg = new THREE.Mesh(POOL.enemyLegGeo, pantsMat);
-        leg.position.set(sx, 0.35, 0); leg.castShadow = true;
+        leg.position.set(sx, 0.35, 0);
         group.add(leg);
     }
 
     // Boots
     for (const sx of [-0.15, 0.15]) {
         const boot = new THREE.Mesh(POOL.enemyBootGeo, POOL.allyBootMat);
-        boot.position.set(sx, 0.05, 0.02); boot.castShadow = true;
+        boot.position.set(sx, 0.05, 0.02);
         group.add(boot);
     }
 
     // Arms
     for (const sx of [-0.4, 0.4]) {
         const arm = new THREE.Mesh(POOL.enemyArmGeo, tunicMat);
-        arm.position.set(sx, 1.1, 0); arm.castShadow = true;
+        arm.position.set(sx, 1.1, 0);
         group.add(arm);
     }
 
@@ -2252,7 +2453,8 @@ function reinforceAllies() {
     // Respawn up to 2 dead allies per wave
     let respawned = 0;
     const roles = ['rifleman', 'rifleman', 'support', 'medic'];
-    const aliveCount = allies.filter(a => a.alive).length;
+    let aliveCount = 0;
+    for (let j = 0; j < allies.length; j++) if (allies[j].alive) aliveCount++;
     const maxToSpawn = Math.min(2, CFG.MAX_ALLIES - aliveCount);
     for (let i = 0; i < maxToSpawn && respawned < 2; i++) {
         const angle = Math.PI + Math.random() * Math.PI;
@@ -2309,7 +2511,7 @@ function nextWave() {
 
 // ---- GRENADE ----
 function throwGrenade() {
-    if (!player || !player.alive || !gameRunning || !pointerLocked) return;
+    if (!player || !player.alive || !gameRunning || (!pointerLocked && !IS_TOUCH)) return;
     if (grenadeInventory <= 0) return;
     if (grenades.length >= CFG.MAX_GRENADES_ACTIVE) return;
     grenadeInventory--;
@@ -2469,8 +2671,14 @@ function update(dt) {
     if (keys['KeyA']) { moveX -= cosYaw; moveZ += sinYaw; }
     if (keys['KeyD']) { moveX += cosYaw; moveZ -= sinYaw; }
 
+    // Touch joystick input (additive — both work)
+    if (IS_TOUCH && (touchMoveX !== 0 || touchMoveY !== 0)) {
+        moveX += -touchMoveY * sinYaw + -touchMoveX * cosYaw;
+        moveZ += -touchMoveY * cosYaw + touchMoveX * sinYaw;
+    }
+
     const isMoving = moveX !== 0 || moveZ !== 0;
-    player.sprinting = keys['ShiftLeft'] && isMoving;
+    player.sprinting = (keys['ShiftLeft'] || touchSprint) && isMoving;
     const speed = player.sprinting ? CFG.SPRINT_SPEED : CFG.PLAYER_SPEED;
 
     if (isMoving) {
@@ -2564,14 +2772,15 @@ function update(dt) {
         weaponModel.position.y += (targetY - weaponModel.position.y) * 0.12;
         weaponModel.position.z += (targetZ - weaponModel.position.z) * 0.12;
         // Weapon tilt during strafe
-        const targetTilt = keys['KeyA'] ? 0.02 : (keys['KeyD'] ? -0.02 : 0);
+        const strafing = keys['KeyA'] || touchMoveX < -0.2 ? 0.02 : (keys['KeyD'] || touchMoveX > 0.2 ? -0.02 : 0);
+        const targetTilt = strafing;
         weaponModel.rotation.z += (targetTilt - weaponModel.rotation.z) * 0.1;
     }
     weaponRecoil *= 0.82;
 
     // Shooting
     const w = player.weapons[player.weaponIndex];
-    if ((mouseDown || keys['Space']) && pointerLocked && w.auto) {
+    if ((mouseDown || touchShootDown || keys['Space']) && (pointerLocked || IS_TOUCH) && w.auto) {
         shoot();
     }
 
@@ -2783,7 +2992,17 @@ function updateHUD(aliveCount, allyAliveCount) {
     DOM.waveNum.textContent = wave;
     DOM.enemyCount.textContent = aliveCount !== undefined ? aliveCount : enemies.length;
     DOM.grenadeCount.textContent = grenadeInventory;
-    if (DOM.allyCount) DOM.allyCount.textContent = allyAliveCount !== undefined ? allyAliveCount : allies.filter(a => a.alive).length;
+    if (DOM.allyCount) {
+        if (allyAliveCount !== undefined) { DOM.allyCount.textContent = allyAliveCount; }
+        else { let ac = 0; for (let j = 0; j < allies.length; j++) if (allies[j].alive) ac++; DOM.allyCount.textContent = ac; }
+    }
+    // Update touch weapon button highlights
+    if (IS_TOUCH) {
+        const btns = document.querySelectorAll('.weapon-btn');
+        for (let i = 0; i < btns.length; i++) {
+            btns[i].classList.toggle('active', i === player.weaponIndex);
+        }
+    }
 }
 
 // ---- GAME FLOW ----
@@ -2824,7 +3043,15 @@ function startGame() {
     if (!audioCtx) initAudio();
 
     gameRunning = true;
-    renderer.domElement.requestPointerLock();
+    if (!IS_TOUCH) {
+        renderer.domElement.requestPointerLock();
+    } else {
+        pointerLocked = true;
+        document.getElementById('touchControls').style.display = 'block';
+    }
+    // Reset touch state
+    touchMoveX = 0; touchMoveY = 0;
+    touchShootDown = false; touchSprint = false;
     nextWave();
     spawnAllies();
 }
@@ -2832,12 +3059,18 @@ function startGame() {
 function gameOver() {
     gameRunning = false;
     clearAllTimeouts();
-    document.exitPointerLock();
+    if (!IS_TOUCH) document.exitPointerLock();
     DOM.hud.style.display = 'none';
     DOM.gameOver.style.display = 'flex';
     DOM.finalScore.textContent = score;
     DOM.finalWave.textContent = wave;
     DOM.finalKills.textContent = kills;
+    // Reset touch state
+    touchMoveX = 0; touchMoveY = 0;
+    touchShootDown = false; touchSprint = false;
+    if (IS_TOUCH) {
+        document.getElementById('touchControls').style.display = 'none';
+    }
 }
 
 // ---- RENDER LOOP ----
@@ -2850,7 +3083,7 @@ function gameLoop() {
 
 // ---- SINGLE FIRE HANDLER ----
 function onMouseClick(e) {
-    if (e.button !== 0 || !pointerLocked || !gameRunning || !player || !player.alive) return;
+    if (e.button !== 0 || (!pointerLocked && !IS_TOUCH) || !gameRunning || !player || !player.alive) return;
     const w = player.weapons[player.weaponIndex];
     if (!w.auto) shoot();
 }
