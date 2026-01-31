@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dogs of War - WW2 FPS</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #000;
+            overflow: hidden;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            color: #fff;
+            user-select: none;
+        }
+        canvas { display: block; }
+
+        /* TITLE SCREEN */
+        #titleScreen {
+            position: fixed; inset: 0; z-index: 200;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            background: linear-gradient(180deg, #0a0a06 0%, #1a1810 50%, #2a2518 100%);
+        }
+        #titleScreen::before {
+            content: '';
+            position: absolute; inset: 0;
+            background: radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.6) 100%);
+        }
+        #titleScreen > * { position: relative; z-index: 1; }
+        .title-star { font-size: 40px; color: #d4a017; margin-bottom: 4px; }
+        #titleScreen h1 {
+            font-family: Impact, 'Arial Black', sans-serif;
+            font-size: 80px;
+            color: #d4a017;
+            text-shadow: 4px 4px 0 #000, 0 0 40px rgba(212,160,23,0.3);
+            letter-spacing: 8px;
+        }
+        .title-sub {
+            font-size: 20px; color: #aaa;
+            letter-spacing: 6px; margin-bottom: 50px;
+        }
+        #titleScreen button {
+            font-family: Impact, 'Arial Black', sans-serif;
+            font-size: 32px; padding: 16px 80px;
+            background: linear-gradient(180deg, #c9940a, #7a5508);
+            color: #fff; border: 2px solid #e0b020;
+            border-radius: 4px; cursor: pointer;
+            letter-spacing: 4px;
+            text-shadow: 2px 2px 4px #000;
+            transition: all 0.2s;
+        }
+        #titleScreen button:hover {
+            background: linear-gradient(180deg, #e0b020, #c9940a);
+            transform: scale(1.05);
+        }
+        .title-info {
+            margin-top: 40px; color: #666;
+            font-size: 14px; text-align: center; line-height: 2;
+        }
+
+        /* CLICK TO PLAY overlay */
+        #clickToPlay {
+            position: fixed; inset: 0; z-index: 150;
+            display: none;
+            align-items: center; justify-content: center;
+            background: rgba(0,0,0,0.7);
+            cursor: pointer;
+        }
+        #clickToPlay span {
+            font-family: Impact, sans-serif;
+            font-size: 36px; color: #d4a017;
+            letter-spacing: 4px;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 0.7; }
+            50% { opacity: 1; }
+        }
+
+        /* HUD */
+        #hud {
+            position: fixed; inset: 0;
+            pointer-events: none; z-index: 50;
+            display: none;
+        }
+
+        /* Crosshair */
+        #crosshair {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 24px; height: 24px;
+        }
+        #crosshair::before, #crosshair::after {
+            content: ''; position: absolute;
+            background: rgba(255,255,255,0.8);
+        }
+        #crosshair::before {
+            width: 2px; height: 24px;
+            left: 50%; transform: translateX(-50%);
+        }
+        #crosshair::after {
+            width: 24px; height: 2px;
+            top: 50%; transform: translateY(-50%);
+        }
+        .crosshair-dot {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 4px; height: 4px;
+            background: rgba(255,50,50,0.9);
+            border-radius: 50%;
+        }
+
+        /* Health + Ammo bar (bottom) */
+        #bottomHud {
+            position: absolute;
+            bottom: 20px; left: 50%;
+            transform: translateX(-50%);
+            display: flex; gap: 40px;
+            align-items: flex-end;
+        }
+        .hud-block {
+            background: rgba(0,0,0,0.6);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 4px;
+            padding: 8px 16px;
+            min-width: 160px;
+        }
+        .hud-block-label {
+            font-size: 10px; color: #888;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 4px;
+        }
+        .health-bar-outer {
+            width: 200px; height: 10px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 5px; overflow: hidden;
+        }
+        .health-bar-inner {
+            height: 100%;
+            background: linear-gradient(90deg, #e74c3c, #2ecc71);
+            border-radius: 5px;
+            transition: width 0.3s;
+        }
+        .ammo-text {
+            font-family: 'Courier New', monospace;
+            font-size: 28px; font-weight: bold;
+            color: #fff;
+        }
+        .ammo-text .ammo-max {
+            font-size: 16px; color: #888;
+        }
+        .weapon-name {
+            font-size: 11px; color: #d4a017;
+            margin-top: 2px;
+        }
+
+        /* Top center - wave info */
+        #topHud {
+            position: absolute;
+            top: 16px; left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+        }
+        .wave-label {
+            font-family: Impact, sans-serif;
+            font-size: 16px; color: #d4a017;
+            letter-spacing: 3px;
+        }
+        .enemy-count {
+            font-size: 12px; color: #ccc;
+        }
+
+        /* Score (top right) */
+        #scoreHud {
+            position: absolute;
+            top: 16px; right: 20px;
+            text-align: right;
+        }
+        .score-val {
+            font-family: Impact, sans-serif;
+            font-size: 28px; color: #fff;
+        }
+        .kill-label {
+            font-size: 11px; color: #888;
+        }
+
+        /* Wave banner */
+        #waveBanner {
+            position: fixed;
+            top: 30%; left: 50%;
+            transform: translate(-50%, -50%);
+            font-family: Impact, sans-serif;
+            font-size: 72px; color: #d4a017;
+            text-shadow: 4px 4px 0 #000, 0 0 60px rgba(212,160,23,0.4);
+            z-index: 60;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.6s;
+            letter-spacing: 6px;
+        }
+
+        /* Hit marker */
+        #hitMarker {
+            position: fixed;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 20px; height: 20px;
+            opacity: 0;
+            z-index: 55;
+            pointer-events: none;
+            transition: opacity 0.1s;
+        }
+        .hm-line {
+            position: absolute;
+            background: #fff;
+        }
+        .hm-line:nth-child(1) { width: 8px; height: 2px; top: 2px; left: 2px; transform: rotate(45deg); }
+        .hm-line:nth-child(2) { width: 8px; height: 2px; top: 2px; right: 2px; transform: rotate(-45deg); }
+        .hm-line:nth-child(3) { width: 8px; height: 2px; bottom: 2px; left: 2px; transform: rotate(-45deg); }
+        .hm-line:nth-child(4) { width: 8px; height: 2px; bottom: 2px; right: 2px; transform: rotate(45deg); }
+
+        /* Damage vignette */
+        #damageVignette {
+            position: fixed; inset: 0;
+            pointer-events: none; z-index: 45;
+            opacity: 0;
+            transition: opacity 0.15s;
+            background: radial-gradient(ellipse at center, transparent 50%, rgba(255,0,0,0.4) 100%);
+        }
+
+        /* Reload bar */
+        #reloadBar {
+            position: absolute;
+            bottom: 90px; left: 50%;
+            transform: translateX(-50%);
+            width: 160px; height: 6px;
+            background: rgba(255,255,255,0.15);
+            border-radius: 3px;
+            overflow: hidden;
+            display: none;
+        }
+        #reloadBarFill {
+            height: 100%;
+            background: #d4a017;
+            border-radius: 3px;
+            width: 0%;
+            transition: width 0.05s linear;
+        }
+        #reloadText {
+            position: absolute;
+            bottom: 100px; left: 50%;
+            transform: translateX(-50%);
+            font-size: 12px; color: #d4a017;
+            letter-spacing: 2px;
+            display: none;
+        }
+
+        /* Game Over */
+        #gameOver {
+            position: fixed; inset: 0; z-index: 180;
+            display: none;
+            flex-direction: column;
+            align-items: center; justify-content: center;
+            background: rgba(0,0,0,0.85);
+        }
+        #gameOver h1 {
+            font-family: Impact, sans-serif;
+            font-size: 72px; color: #e74c3c;
+            text-shadow: 4px 4px 0 #000;
+            margin-bottom: 10px;
+        }
+        #gameOver .stats {
+            font-size: 24px; color: #d4a017;
+            margin-bottom: 10px;
+        }
+        #gameOver .stats2 {
+            font-size: 16px; color: #aaa;
+            margin-bottom: 40px;
+        }
+        #gameOver button {
+            font-family: Impact, sans-serif;
+            font-size: 28px; padding: 14px 60px;
+            background: linear-gradient(180deg, #c9940a, #7a5508);
+            color: #fff; border: 2px solid #e0b020;
+            border-radius: 4px; cursor: pointer;
+            letter-spacing: 3px;
+        }
+        #gameOver button:hover {
+            background: linear-gradient(180deg, #e0b020, #c9940a);
+        }
+
+        /* Scope overlay */
+        #scopeOverlay {
+            position: fixed; inset: 0;
+            display: none; z-index: 52;
+            pointer-events: none;
+            background: radial-gradient(circle at center,
+                transparent 18%,
+                rgba(0,0,0,0.15) 18.5%,
+                rgba(0,0,0,0.15) 22%,
+                #000 22.5%
+            );
+        }
+        .scope-ring {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 38vmin; height: 38vmin;
+            border: 2px solid rgba(0,0,0,0.6);
+            border-radius: 50%;
+        }
+        .scope-crossV {
+            position: absolute;
+            top: 0; bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 1px;
+            background: rgba(0,0,0,0.7);
+        }
+        .scope-crossH {
+            position: absolute;
+            left: 0; right: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            height: 1px;
+            background: rgba(0,0,0,0.7);
+        }
+        .scope-mil {
+            position: absolute;
+            left: 50%; transform: translateX(-50%);
+            width: 12px; height: 1px;
+            background: rgba(0,0,0,0.5);
+        }
+        .scope-mil-1 { top: calc(50% + 30px); }
+        .scope-mil-2 { top: calc(50% + 60px); }
+        .scope-mil-3 { top: calc(50% + 90px); }
+
+        /* Weapon view model hint */
+        #weaponHint {
+            position: absolute;
+            bottom: 70px; left: 50%;
+            transform: translateX(-50%);
+            font-size: 10px; color: #555;
+            letter-spacing: 1px;
+        }
+
+        /* COD-style blood screen (low health) */
+        #bloodScreen {
+            position: fixed; inset: 0;
+            pointer-events: none; z-index: 44;
+            opacity: 0;
+            transition: opacity 0.3s;
+            background:
+                radial-gradient(ellipse at center, transparent 30%, rgba(120,0,0,0.5) 100%),
+                radial-gradient(ellipse at 20% 20%, rgba(80,0,0,0.3) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 80%, rgba(80,0,0,0.3) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 20%, rgba(60,0,0,0.2) 0%, transparent 50%),
+                radial-gradient(ellipse at 20% 80%, rgba(60,0,0,0.2) 0%, transparent 50%);
+        }
+
+        /* Kill feed (top-right, COD style) */
+        #killFeed {
+            position: absolute;
+            top: 80px; right: 20px;
+            display: flex; flex-direction: column;
+            gap: 4px; pointer-events: none;
+            z-index: 55;
+        }
+        .kill-entry {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            font-size: 13px;
+            color: #fff;
+            background: rgba(0,0,0,0.5);
+            padding: 4px 10px;
+            border-left: 3px solid #d4a017;
+            border-radius: 2px;
+            animation: killFadeIn 0.2s ease-out, killFadeOut 0.5s ease-in 2.5s forwards;
+            white-space: nowrap;
+        }
+        .kill-entry .kill-weapon { color: #888; font-size: 11px; }
+        .kill-entry .kill-score { color: #d4a017; font-weight: bold; margin-left: 6px; }
+        @keyframes killFadeIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+        @keyframes killFadeOut { from { opacity: 1; } to { opacity: 0; } }
+
+        /* Grenade indicator */
+        #grenadeHud {
+            position: absolute;
+            bottom: 25px; right: 20px;
+            background: rgba(0,0,0,0.6);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 4px;
+            padding: 6px 12px;
+            font-size: 12px; color: #ccc;
+        }
+        #grenadeHud .grenade-icon {
+            display: inline-block;
+            width: 12px; height: 18px;
+            background: #6a6a4a;
+            border-radius: 2px 2px 4px 4px;
+            margin-right: 4px;
+            vertical-align: middle;
+        }
+        #grenadeHud .grenade-count {
+            font-family: 'Courier New', monospace;
+            font-size: 18px; font-weight: bold;
+            color: #fff;
+        }
+
+        /* Headshot indicator */
+        #headshotText {
+            position: fixed;
+            top: 40%; left: 50%;
+            transform: translate(-50%, -50%);
+            font-family: Impact, sans-serif;
+            font-size: 28px; color: #ff4444;
+            text-shadow: 2px 2px 0 #000;
+            z-index: 56; opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s;
+            letter-spacing: 3px;
+        }
+
+        /* Compass */
+        #compass {
+            position: absolute;
+            top: 8px; left: 50%;
+            transform: translateX(-50%);
+            width: 300px; height: 20px;
+            overflow: hidden;
+            background: rgba(0,0,0,0.4);
+            border-radius: 2px;
+            font-size: 10px;
+            color: rgba(255,255,255,0.6);
+            text-align: center;
+            line-height: 20px;
+            letter-spacing: 2px;
+        }
+        #compassInner {
+            position: absolute;
+            white-space: nowrap;
+            transition: transform 0.1s linear;
+        }
+        #compass .compass-mark {
+            display: inline-block;
+            width: 40px; text-align: center;
+        }
+        #compass .compass-cardinal { color: #d4a017; font-weight: bold; }
+
+        /* Ally HUD */
+        #allyHud {
+            position: absolute;
+            top: 16px; left: 20px;
+            background: rgba(0,0,0,0.6);
+            border: 1px solid rgba(75,139,59,0.3);
+            border-radius: 4px;
+            padding: 6px 12px;
+            font-size: 13px;
+            color: #4b8b3b;
+            font-family: 'Segoe UI', Arial, sans-serif;
+        }
+        #allyHud .ally-icon {
+            font-size: 14px;
+            margin-right: 4px;
+        }
+        #allyHud .ally-count {
+            font-family: 'Courier New', monospace;
+            font-size: 16px;
+            font-weight: bold;
+            color: #5ea04a;
+        }
+    </style>
+</head>
+<body>
+
+<!-- Title Screen -->
+<div id="titleScreen">
+    <div class="title-star">&#9733;</div>
+    <h1>DOGS OF WAR</h1>
+    <div class="title-sub">WORLD WAR II</div>
+    <button id="startBtn">DEPLOY</button>
+    <div class="title-info">
+        WASD - Move | Mouse - Aim | SPACE/Click - Shoot | R - Reload<br>
+        1/2/3/4 - Weapons | Right-Click - Scope/Zoom | SHIFT - Sprint | V - Jump<br>
+        G - Grenade | Health regenerates after 4 seconds
+    </div>
+</div>
+
+<!-- Click to play (pointer lock) -->
+<div id="clickToPlay">
+    <span>CLICK TO RESUME</span>
+</div>
+
+<!-- HUD -->
+<div id="hud">
+    <div id="crosshair"><div class="crosshair-dot"></div></div>
+
+    <div id="topHud">
+        <div class="wave-label">WAVE <span id="waveNum">1</span></div>
+        <div class="enemy-count">Enemies: <span id="enemyCount">0</span></div>
+    </div>
+
+    <div id="scoreHud">
+        <div class="score-val" id="scoreText">0</div>
+        <div class="kill-label">KILLS: <span id="killCount">0</span></div>
+    </div>
+
+    <div id="bottomHud">
+        <div class="hud-block">
+            <div class="hud-block-label">Health</div>
+            <div class="health-bar-outer">
+                <div class="health-bar-inner" id="healthBar" style="width:100%"></div>
+            </div>
+            <div style="font-size:12px;color:#ccc;margin-top:2px">
+                <span id="healthText">100</span> / 100
+            </div>
+        </div>
+        <div class="hud-block" style="text-align:center">
+            <div class="hud-block-label">Ammo</div>
+            <div class="ammo-text">
+                <span id="ammoText">30</span><span class="ammo-max"> / <span id="ammoMax">30</span></span>
+            </div>
+            <div class="weapon-name" id="weaponName">M1 Garand</div>
+        </div>
+    </div>
+
+    <div id="reloadText">RELOADING</div>
+    <div id="reloadBar"><div id="reloadBarFill"></div></div>
+    <div id="weaponHint">[1] M1 Garand &nbsp; [2] Thompson &nbsp; [3] Trench Gun &nbsp; [4] Springfield Sniper</div>
+
+    <!-- Ally HUD -->
+    <div id="allyHud">
+        <span class="ally-icon">&#9733;</span> ALLIES: <span class="ally-count" id="allyCount">0</span>
+    </div>
+
+    <!-- Kill feed -->
+    <div id="killFeed"></div>
+
+    <!-- Grenade HUD -->
+    <div id="grenadeHud">
+        <span class="grenade-icon"></span>
+        <span class="grenade-count" id="grenadeCount">3</span>
+    </div>
+
+    <!-- Compass -->
+    <div id="compass">
+        <div id="compassInner"></div>
+    </div>
+</div>
+
+<!-- Hit marker -->
+<div id="hitMarker">
+    <div class="hm-line"></div><div class="hm-line"></div>
+    <div class="hm-line"></div><div class="hm-line"></div>
+</div>
+
+<!-- Scope Overlay -->
+<div id="scopeOverlay">
+    <div class="scope-ring"></div>
+    <div class="scope-crossV"></div>
+    <div class="scope-crossH"></div>
+    <div class="scope-mil scope-mil-1"></div>
+    <div class="scope-mil scope-mil-2"></div>
+    <div class="scope-mil scope-mil-3"></div>
+</div>
+
+<div id="bloodScreen"></div>
+<div id="damageVignette"></div>
+<div id="headshotText">HEADSHOT</div>
+<div id="waveBanner"></div>
+
+<!-- Game Over -->
+<div id="gameOver">
+    <h1>KILLED IN ACTION</h1>
+    <div class="stats">Score: <span id="finalScore">0</span></div>
+    <div class="stats2">Wave <span id="finalWave">1</span> | Kills: <span id="finalKills">0</span></div>
+    <button id="restartBtn">FIGHT AGAIN</button>
+</div>
+
+<!-- Three.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="game.js"></script>
+</body>
+</html>
