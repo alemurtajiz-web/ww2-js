@@ -891,6 +891,17 @@ function getCutscenePath(mapKey) {
     const spawn = theme.playerSpawn;
     const enemyZ = theme.enemySpawnZ ? (theme.enemySpawnZ[0] + theme.enemySpawnZ[1]) / 2 : -50;
     const S = CFG.MAP_SIZE;
+
+    // Berlin: sweep past the Fernsehturm and burning city
+    if (mapKey === 'berlin') {
+        return [
+            { x: 50, y: 70, z: -80, lookX: 30, lookY: 55, lookZ: -85 }, // start high, looking at TV tower
+            { x: 20, y: 50, z: -50, lookX: 0, lookY: 10, lookZ: -30 },  // sweep over burning buildings
+            { x: -30, y: 30, z: 0, lookX: 0, lookY: 5, lookZ: -20 },    // across the streets and shops
+            { x: spawn.x + 5, y: 12, z: spawn.z + 8, lookX: spawn.x, lookY: 3, lookZ: enemyZ }, // down to player spawn
+        ];
+    }
+
     return [
         { x: -S * 0.4, y: 60, z: spawn.z + 30, lookX: 0, lookY: 0, lookZ: enemyZ },
         { x: S * 0.15, y: 35, z: (spawn.z + enemyZ) / 2, lookX: 0, lookY: 5, lookZ: enemyZ },
@@ -1602,6 +1613,307 @@ function createMap(themeKey) {
     // Weather
     if (theme.rain) createRain();
     if (theme.snow) createSnowSystem();
+
+    // === BERLIN CITY SCENE — extra buildings, shops, Fernsehturm ===
+    if (themeKey === 'berlin') {
+        const conc = MAT.concrete || MAT.concreteDark;
+        const concLight = new THREE.MeshLambertMaterial({ color: 0x8a8580 });
+        const brickMat = new THREE.MeshLambertMaterial({ color: 0x8b4513 });
+        const brickDark = new THREE.MeshLambertMaterial({ color: 0x6b3310 });
+        const windowMat = new THREE.MeshLambertMaterial({ color: 0x1a2530 });
+        const roofMat = new THREE.MeshLambertMaterial({ color: 0x3a3530 });
+        const shopFront = new THREE.MeshLambertMaterial({ color: 0x5a4a3a });
+        const metalMat = new THREE.MeshLambertMaterial({ color: 0x888888, metalness: 0.6 });
+        const fireMat = new THREE.MeshBasicMaterial({ color: 0xff4400 });
+        const damagedMat = new THREE.MeshLambertMaterial({ color: 0x4a4540 });
+
+        // ---- Tall apartment blocks lining streets ----
+        const cityBuildings = [
+            { x: -55, z: -25, w: 12, d: 8, h: 14, mat: brickMat },
+            { x: -55, z: -5, w: 10, d: 10, h: 18, mat: concLight },
+            { x: -55, z: 15, w: 11, d: 9, h: 12, mat: brickDark },
+            { x: -55, z: 35, w: 10, d: 8, h: 16, mat: brickMat },
+            { x: -55, z: 50, w: 12, d: 10, h: 10, mat: damagedMat },
+            { x: 55, z: -25, w: 10, d: 10, h: 16, mat: brickDark },
+            { x: 55, z: -5, w: 12, d: 8, h: 20, mat: concLight },
+            { x: 55, z: 15, w: 10, d: 9, h: 14, mat: brickMat },
+            { x: 55, z: 35, w: 11, d: 10, h: 12, mat: damagedMat },
+            { x: 55, z: 50, w: 10, d: 8, h: 15, mat: brickDark },
+            // Back row
+            { x: -65, z: -15, w: 8, d: 8, h: 22, mat: concLight },
+            { x: -65, z: 10, w: 9, d: 9, h: 11, mat: brickMat },
+            { x: -65, z: 30, w: 10, d: 8, h: 17, mat: brickDark },
+            { x: 65, z: -15, w: 9, d: 9, h: 19, mat: brickMat },
+            { x: 65, z: 10, w: 8, d: 8, h: 13, mat: concLight },
+            { x: 65, z: 30, w: 10, d: 10, h: 16, mat: damagedMat },
+            // Behind player
+            { x: -25, z: 55, w: 10, d: 8, h: 14, mat: brickMat },
+            { x: 0, z: 58, w: 12, d: 8, h: 18, mat: concLight },
+            { x: 25, z: 55, w: 10, d: 8, h: 12, mat: brickDark },
+            // Far enemy side
+            { x: -25, z: -60, w: 12, d: 10, h: 20, mat: concLight },
+            { x: 0, z: -65, w: 14, d: 8, h: 24, mat: brickMat },
+            { x: 25, z: -60, w: 10, d: 10, h: 16, mat: brickDark },
+            { x: -45, z: -55, w: 8, d: 8, h: 14, mat: damagedMat },
+            { x: 45, z: -55, w: 8, d: 8, h: 18, mat: brickMat },
+        ];
+
+        for (const b of cityBuildings) {
+            const bGroup = new THREE.Group();
+            // Main structure
+            const body = new THREE.Mesh(new THREE.BoxGeometry(b.w, b.h, b.d), b.mat);
+            body.position.y = b.h / 2;
+            body.castShadow = true;
+            body.receiveShadow = true;
+            bGroup.add(body);
+
+            // Windows (rows and columns)
+            const rows = Math.floor(b.h / 3);
+            const cols = Math.floor(b.w / 2.5);
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    if (Math.random() < 0.7) { // some windows missing (war damage)
+                        const win = new THREE.Mesh(new THREE.PlaneGeometry(1, 1.4), windowMat);
+                        const wx = -b.w / 2 + 1.5 + c * (b.w - 2) / Math.max(cols - 1, 1);
+                        const wy = 2 + r * 3;
+                        // Front face
+                        win.position.set(wx, wy, b.d / 2 + 0.01);
+                        bGroup.add(win);
+                        // Back face
+                        const win2 = win.clone();
+                        win2.position.z = -b.d / 2 - 0.01;
+                        win2.rotation.y = Math.PI;
+                        bGroup.add(win2);
+                    }
+                }
+            }
+
+            // Roof
+            const roof = new THREE.Mesh(new THREE.BoxGeometry(b.w + 0.5, 0.4, b.d + 0.5), roofMat);
+            roof.position.y = b.h + 0.2;
+            bGroup.add(roof);
+
+            // Random war damage — chunks missing from top
+            if (Math.random() < 0.4) {
+                const dmgW = 2 + Math.random() * 4;
+                const dmgH = 2 + Math.random() * 5;
+                const dmg = new THREE.Mesh(new THREE.BoxGeometry(dmgW, dmgH, b.d + 1), new THREE.MeshBasicMaterial({ visible: false }));
+                dmg.position.set((Math.random() - 0.5) * b.w * 0.5, b.h - dmgH / 2 + 0.5, 0);
+                bGroup.add(dmg);
+                // Rubble at base
+                for (let rb = 0; rb < 3; rb++) {
+                    const rubble = new THREE.Mesh(
+                        new THREE.BoxGeometry(0.5 + Math.random(), 0.3 + Math.random() * 0.5, 0.5 + Math.random()),
+                        damagedMat
+                    );
+                    rubble.position.set(
+                        b.x > 0 ? -b.w / 2 - 1 - Math.random() * 2 : b.w / 2 + 1 + Math.random() * 2,
+                        0.2,
+                        (Math.random() - 0.5) * b.d
+                    );
+                    rubble.rotation.set(Math.random() * 0.3, Math.random() * Math.PI, Math.random() * 0.3);
+                    bGroup.add(rubble);
+                }
+            }
+
+            bGroup.position.set(b.x, 0, b.z);
+            addMapObject(bGroup);
+        }
+
+        // ---- Shops at street level ----
+        const shops = [
+            { x: -48, z: -20, label: 'BÄCKEREI' },
+            { x: -48, z: 0, label: 'METZGEREI' },
+            { x: -48, z: 20, label: 'APOTHEKE' },
+            { x: 48, z: -20, label: 'BUCHHANDLUNG' },
+            { x: 48, z: 0, label: 'KONDITOREI' },
+            { x: 48, z: 20, label: 'SCHNEIDER' },
+            { x: -20, z: 48, label: 'GASTHAUS' },
+            { x: 20, z: 48, label: 'KINO' },
+        ];
+        for (const sh of shops) {
+            const sg = new THREE.Group();
+            // Shop body
+            const front = new THREE.Mesh(new THREE.BoxGeometry(6, 3.5, 4), shopFront);
+            front.position.y = 1.75;
+            front.castShadow = true;
+            sg.add(front);
+            // Awning
+            const awning = new THREE.Mesh(new THREE.BoxGeometry(6.5, 0.1, 1.5),
+                new THREE.MeshLambertMaterial({ color: Math.random() > 0.5 ? 0x8b2020 : 0x2b4060 }));
+            awning.position.set(0, 3.2, 2.5);
+            sg.add(awning);
+            // Shop window
+            const shopWin = new THREE.Mesh(new THREE.PlaneGeometry(4, 2), windowMat);
+            shopWin.position.set(0, 1.8, 2.01);
+            sg.add(shopWin);
+            // Door
+            const door = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 2.5),
+                new THREE.MeshLambertMaterial({ color: 0x3a2a1a }));
+            door.position.set(-2, 1.25, 2.01);
+            sg.add(door);
+
+            sg.position.set(sh.x, 0, sh.z);
+            // Face toward center
+            sg.rotation.y = Math.atan2(-sh.x, -sh.z);
+            addMapObject(sg);
+        }
+
+        // ---- Buildings on fire ----
+        const burningBuildings = [
+            { x: -55, z: -5 }, { x: 55, z: -5 }, { x: 0, z: -65 },
+            { x: -65, z: 30 }, { x: 65, z: -15 },
+        ];
+        for (const bb of burningBuildings) {
+            // Fire glow at top of building
+            for (let f = 0; f < 3; f++) {
+                const fireGlow = new THREE.Mesh(
+                    new THREE.SphereGeometry(1 + Math.random() * 1.5, 6, 6),
+                    new THREE.MeshBasicMaterial({ color: 0xff4400, transparent: true, opacity: 0.6 })
+                );
+                fireGlow.position.set(
+                    bb.x + (Math.random() - 0.5) * 4,
+                    10 + Math.random() * 8,
+                    bb.z + (Math.random() - 0.5) * 4
+                );
+                addMapObject(fireGlow);
+            }
+            // Smoke column
+            for (let s = 0; s < 4; s++) {
+                const smoke = new THREE.Mesh(
+                    new THREE.SphereGeometry(1.5 + Math.random() * 2, 6, 6),
+                    new THREE.MeshBasicMaterial({ color: 0x333333, transparent: true, opacity: 0.35 })
+                );
+                smoke.position.set(
+                    bb.x + (Math.random() - 0.5) * 3,
+                    15 + s * 5 + Math.random() * 3,
+                    bb.z + (Math.random() - 0.5) * 3
+                );
+                addMapObject(smoke);
+            }
+        }
+
+        // ---- Street rubble and debris ----
+        for (let i = 0; i < 30; i++) {
+            const rx = (Math.random() - 0.5) * S * 1.6;
+            const rz = (Math.random() - 0.5) * S * 1.6;
+            const rubble = new THREE.Mesh(
+                new THREE.BoxGeometry(0.5 + Math.random() * 1.5, 0.3 + Math.random() * 0.8, 0.5 + Math.random() * 1.5),
+                Math.random() > 0.5 ? damagedMat : brickMat
+            );
+            rubble.position.set(rx, 0.2, rz);
+            rubble.rotation.set(Math.random() * 0.4, Math.random() * Math.PI, Math.random() * 0.4);
+            rubble.castShadow = true;
+            addMapObject(rubble);
+        }
+
+        // ---- FERNSEHTURM (Berlin TV Tower) ----
+        const tvTower = new THREE.Group();
+        // Tall shaft
+        const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.8, 70, 8), metalMat);
+        shaft.position.y = 35;
+        shaft.castShadow = true;
+        tvTower.add(shaft);
+        // The sphere (observation deck)
+        const sphere = new THREE.Mesh(new THREE.SphereGeometry(5, 12, 12),
+            new THREE.MeshLambertMaterial({ color: 0xaaaaaa, metalness: 0.5 }));
+        sphere.position.y = 55;
+        sphere.castShadow = true;
+        tvTower.add(sphere);
+        // Sphere ring/band
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(5.2, 0.3, 8, 16),
+            new THREE.MeshLambertMaterial({ color: 0x666666 }));
+        ring.position.y = 55;
+        ring.rotation.x = Math.PI / 2;
+        tvTower.add(ring);
+        // Upper spike/antenna
+        const antenna = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.3, 20, 6), metalMat);
+        antenna.position.y = 70;
+        tvTower.add(antenna);
+        // Antenna tip
+        const tip = new THREE.Mesh(new THREE.SphereGeometry(0.4, 6, 6),
+            new THREE.MeshBasicMaterial({ color: 0xff0000 }));
+        tip.position.y = 80;
+        tvTower.add(tip);
+        // Base structure
+        const base = new THREE.Mesh(new THREE.CylinderGeometry(3, 5, 6, 8), concLight);
+        base.position.y = 3;
+        tvTower.add(base);
+
+        // Place in the background — visible from battlefield
+        tvTower.position.set(30, 0, -85);
+        addMapObject(tvTower);
+
+        // ---- Destroyed tram / streetcar ----
+        const tram = new THREE.Group();
+        const tramBody = new THREE.Mesh(new THREE.BoxGeometry(3, 2.5, 8),
+            new THREE.MeshLambertMaterial({ color: 0xc4a832 }));
+        tramBody.position.y = 1.5;
+        tram.add(tramBody);
+        const tramRoof = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.2, 8.2), roofMat);
+        tramRoof.position.y = 2.8;
+        tram.add(tramRoof);
+        // Windows
+        for (let tw = 0; tw < 3; tw++) {
+            const tramWin = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 1), windowMat);
+            tramWin.position.set(1.51, 1.8, -2.5 + tw * 2.5);
+            tram.add(tramWin);
+            const tramWin2 = tramWin.clone();
+            tramWin2.position.x = -1.51;
+            tramWin2.rotation.y = Math.PI;
+            tram.add(tramWin2);
+        }
+        // Tilted — derailed
+        tram.position.set(-30, 0, -10);
+        tram.rotation.z = 0.15;
+        tram.rotation.y = 0.3;
+        addMapObject(tram);
+
+        // ---- Overturned car ----
+        const car = new THREE.Group();
+        const carBody = new THREE.Mesh(new THREE.BoxGeometry(2, 1.2, 4),
+            new THREE.MeshLambertMaterial({ color: 0x2a3a2a }));
+        carBody.position.y = 0.6;
+        car.add(carBody);
+        const carRoof = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.8, 2.5),
+            new THREE.MeshLambertMaterial({ color: 0x2a3a2a }));
+        carRoof.position.set(0, 1.5, -0.3);
+        car.add(carRoof);
+        // Wheels
+        for (const wx of [-1, 1]) {
+            for (const wz of [-1.2, 1.2]) {
+                const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 0.2, 8),
+                    new THREE.MeshLambertMaterial({ color: 0x1a1a1a }));
+                wheel.rotation.z = Math.PI / 2;
+                wheel.position.set(wx * 1.1, 0.35, wz);
+                car.add(wheel);
+            }
+        }
+        car.position.set(22, 0, 5);
+        car.rotation.z = 0.8; // flipped on side
+        car.rotation.y = -0.5;
+        addMapObject(car);
+
+        // ---- Lamposts (broken) ----
+        for (let lp = 0; lp < 6; lp++) {
+            const lamp = new THREE.Group();
+            const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 4, 6), metalMat);
+            pole.position.y = 2;
+            lamp.add(pole);
+            const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.5, 6), metalMat);
+            arm.position.set(0.5, 3.8, 0);
+            arm.rotation.z = Math.PI / 3;
+            lamp.add(arm);
+            // Some tilted (war damage)
+            lamp.position.set(
+                lp < 3 ? -42 + lp * 1 : 42 + (lp - 3) * 1,
+                0,
+                -30 + lp * 12
+            );
+            lamp.rotation.z = (Math.random() - 0.5) * 0.4;
+            addMapObject(lamp);
+        }
+    }
 
     // Player-flyable Luftwaffe plane
     createGroundedPlane();
@@ -6818,7 +7130,7 @@ function startCutscene() {
     if (!data) { endCutscene(); return; }
 
     cutsceneActive = true;
-    cutsceneDuration = 8;
+    cutsceneDuration = selectedMap === 'berlin' ? 10 : 8;
     cutsceneWaypoints = getCutscenePath(selectedMap);
     cutsceneStartTime = performance.now() / 1000;
 
@@ -6828,6 +7140,9 @@ function startCutscene() {
         camera.position.set(wp.x, wp.y, wp.z);
         camera.lookAt(wp.lookX, wp.lookY, wp.lookZ);
     }
+
+    // Hide grounded plane during cutscene so it doesn't block the view
+    if (groundedPlane) groundedPlane.group.visible = false;
 
     // Show overlay
     const overlay = document.getElementById('cutsceneOverlay');
@@ -6929,6 +7244,9 @@ function endCutscene() {
     // Hide overlay, show HUD
     document.getElementById('cutsceneOverlay').style.display = 'none';
     DOM.hud.style.display = 'block';
+
+    // Show grounded plane again
+    if (groundedPlane) groundedPlane.group.visible = true;
 
     // Now do the stuff that was previously in startGame after createMap
     createPlayer();
