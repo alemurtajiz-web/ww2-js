@@ -3734,7 +3734,7 @@ function createBombMesh() {
 }
 
 // ---- AEROPLANE SYSTEM ----
-function createAeroplane() {
+function createAeroplane(berlinMode) {
     const group = new THREE.Group();
 
     // Fuselage
@@ -3782,8 +3782,8 @@ function createAeroplane() {
     const startX = side * (CFG.MAP_SIZE + 40);
     const endX = -side * (CFG.MAP_SIZE + 40);
     const startZ = (Math.random() - 0.5) * CFG.MAP_SIZE;
-    const altitude = 35 + Math.random() * 20;
-    const speed = 25 + Math.random() * 15;
+    const altitude = berlinMode ? (25 + Math.random() * 10) : (35 + Math.random() * 20);
+    const speed = berlinMode ? (18 + Math.random() * 10) : (25 + Math.random() * 15);
 
     group.position.set(startX, altitude, startZ);
     // Point toward destination
@@ -3800,8 +3800,8 @@ function createAeroplane() {
         vz: (Math.random() - 0.5) * 3,
         endX,
         alive: true,
-        nextBomb: performance.now() + 1500 + Math.random() * 3000,
-        bombsLeft: 1 + Math.floor(Math.random() * 2),
+        nextBomb: performance.now() + (berlinMode ? 500 + Math.random() * 1000 : 1500 + Math.random() * 3000),
+        bombsLeft: berlinMode ? (5 + Math.floor(Math.random() * 4)) : (1 + Math.floor(Math.random() * 2)),
         propMat,
     };
 }
@@ -3955,11 +3955,12 @@ function updateAeroplanes(dt) {
     }
 }
 
-function spawnAeroplaneWave() {
-    if (aeroplanes.length >= 4) return; // allow more planes
-    const count = wave >= 5 ? 2 : 1; // double planes from wave 5
+function spawnAeroplaneWave(berlinMode) {
+    const maxPlanes = berlinMode ? 8 : 4;
+    if (aeroplanes.length >= maxPlanes) return;
+    const count = berlinMode ? 3 : (wave >= 5 ? 2 : 1);
     for (let i = 0; i < count; i++) {
-        if (aeroplanes.length < 4) aeroplanes.push(createAeroplane());
+        if (aeroplanes.length < maxPlanes) aeroplanes.push(createAeroplane(berlinMode));
     }
 }
 
@@ -4012,21 +4013,35 @@ function nextWave() {
     // Reinforce dead allies
     if (wave > 1) reinforceAllies();
 
-    // Aeroplane bombing runs — start wave 1, extra runs on later waves
-    safeTimeout(() => { if (gameRunning) spawnAeroplaneWave(); }, 1500 + Math.random() * 2000);
-    if (wave >= 3) {
-        safeTimeout(() => { if (gameRunning) spawnAeroplaneWave(); }, 8000 + Math.random() * 4000);
-    }
-    if (wave >= 6) {
-        safeTimeout(() => { if (gameRunning) spawnAeroplaneWave(); }, 15000 + Math.random() * 5000);
+    // Berlin Wave 3: massive aerial bombardment — constant waves of bombers
+    const isBerlinFinal = selectedMap === 'berlin' && wave >= 3;
+    if (isBerlinFinal) {
+        // Immediate heavy bomber wave
+        safeTimeout(() => { if (gameRunning) spawnAeroplaneWave(true); }, 500);
+        // Relentless follow-up waves every few seconds
+        for (let bw = 0; bw < 6; bw++) {
+            safeTimeout(() => { if (gameRunning) spawnAeroplaneWave(true); }, 3000 + bw * 4000);
+        }
+    } else {
+        // Normal aeroplane bombing runs
+        safeTimeout(() => { if (gameRunning) spawnAeroplaneWave(); }, 1500 + Math.random() * 2000);
+        if (wave >= 3) {
+            safeTimeout(() => { if (gameRunning) spawnAeroplaneWave(); }, 8000 + Math.random() * 4000);
+        }
+        if (wave >= 6) {
+            safeTimeout(() => { if (gameRunning) spawnAeroplaneWave(); }, 15000 + Math.random() * 5000);
+        }
     }
 
     DOM.waveBanner.textContent = `WAVE ${wave}`;
     DOM.waveBanner.style.opacity = '1';
     safeTimeout(() => { DOM.waveBanner.style.opacity = '0'; }, 2500);
 
-    const count = Math.min(4 + wave * 3, CFG.MAX_ENEMIES - enemies.length);
-    for (let i = 0; i < count; i++) {
+    // Berlin Wave 3: massive enemy infantry — mostly brutes and snipers
+    const enemyCount = isBerlinFinal
+        ? Math.min(CFG.MAX_ENEMIES, CFG.MAX_ENEMIES - enemies.length)
+        : Math.min(4 + wave * 3, CFG.MAX_ENEMIES - enemies.length);
+    for (let i = 0; i < enemyCount; i++) {
         let ex, ez, attempts = 0;
         do {
             // Enemies spawn from the enemy side of the battlefield
@@ -4039,14 +4054,29 @@ function nextWave() {
         } while (checkCollision(ex, ez, 1.5) && attempts < 30);
 
         let type = 'grunt';
-        if (wave >= 3 && Math.random() < 0.25) type = 'sniper';
-        if (wave >= 5 && Math.random() < 0.15) type = 'brute';
+        if (isBerlinFinal) {
+            // Berlin Wave 3: brutal mix — 40% brutes, 30% snipers, 30% grunts
+            const r = Math.random();
+            if (r < 0.4) type = 'brute';
+            else if (r < 0.7) type = 'sniper';
+        } else {
+            if (wave >= 3 && Math.random() < 0.25) type = 'sniper';
+            if (wave >= 5 && Math.random() < 0.15) type = 'brute';
+        }
 
         enemies.push(createEnemy(ex, ez, type));
     }
 
-    // Spawn enemy tanks starting wave 3
-    if (wave >= 3 && enemyTanks.length < MAX_ENEMY_TANKS) {
+    // Spawn enemy tanks
+    if (isBerlinFinal) {
+        // Berlin Wave 3: flood with 6 enemy tanks
+        const berlinMaxTanks = 6;
+        while (enemyTanks.length < berlinMaxTanks) {
+            const tankX = (Math.random() - 0.5) * CFG.MAP_SIZE * 0.8;
+            const tankZ = -25 - Math.random() * 40;
+            enemyTanks.push(createEnemyTank(tankX, tankZ));
+        }
+    } else if (wave >= 3 && enemyTanks.length < MAX_ENEMY_TANKS) {
         const tankX = (Math.random() - 0.5) * CFG.MAP_SIZE * 0.8;
         const tankZ = -35 - Math.random() * 30;
         enemyTanks.push(createEnemyTank(tankX, tankZ));
