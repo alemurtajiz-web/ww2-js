@@ -1120,6 +1120,9 @@
             justify-content: center;
             pointer-events: auto;
             cursor: pointer;
+            touch-action: none;
+            -webkit-user-select: none;
+            user-select: none;
         }
         #cutsceneOverlay .letterbox-top,
         #cutsceneOverlay .letterbox-bottom {
@@ -1228,6 +1231,9 @@
             position: fixed; inset: 0; z-index: 190;
             display: none;
             pointer-events: none;
+            touch-action: none;
+            -webkit-user-select: none;
+            user-select: none;
         }
         #berlinFadeBlack {
             position: absolute; inset: 0;
@@ -1313,6 +1319,43 @@
         }
         #berlinFinalBtn:hover {
             background: linear-gradient(180deg, #666, #444);
+        }
+
+        /* Touch-specific overrides for cutscene/cinematic */
+        .touch-device .cutscene-title { font-size: 42px; letter-spacing: 4px; }
+        .touch-device .cutscene-subtitle { font-size: 14px; letter-spacing: 2px; }
+        .touch-device .cutscene-theater { font-size: 11px; }
+        .touch-device .cutscene-briefing {
+            font-size: 13px; width: 85%; bottom: 14%;
+            padding-left: 10px;
+        }
+        .touch-device .cutscene-skip {
+            font-size: 16px;
+            bottom: 3%;
+            right: 50%;
+            transform: translateX(50%);
+            background: rgba(255,255,255,0.1);
+            padding: 12px 24px;
+            border-radius: 6px;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        .touch-device #berlinFinalBtn {
+            font-size: 28px;
+            padding: 18px 60px;
+            bottom: 12%;
+        }
+        .touch-device #berlinAnnouncement {
+            font-size: 20px;
+            top: 18%;
+        }
+        .touch-device #berlinHurra {
+            font-size: 38px;
+        }
+        .touch-device #berlinFinalTitle h1 {
+            font-size: 56px;
+        }
+        .touch-device #berlinFinalTitle .final-years {
+            font-size: 24px;
         }
     </style>
 </head>

@@ -8253,9 +8253,17 @@ function init() {
     addListener(document.getElementById('cutsceneOverlay'), 'click', () => {
         if (cutsceneActive) endCutscene();
     });
+    addListener(document.getElementById('cutsceneOverlay'), 'touchend', (e) => {
+        e.preventDefault();
+        if (cutsceneActive) endCutscene();
+    });
 
     // Berlin ending cinematic — back to lobby button
     addListener(document.getElementById('berlinFinalBtn'), 'click', () => {
+        endBerlinCinematic();
+    });
+    addListener(document.getElementById('berlinFinalBtn'), 'touchend', (e) => {
+        e.preventDefault();
         endBerlinCinematic();
     });
 
