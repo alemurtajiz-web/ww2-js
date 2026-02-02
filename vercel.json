@@ -1,0 +1,8 @@
+{
+  "buildCommand": "",
+  "outputDirectory": ".",
+  "framework": null,
+  "rewrites": [
+    { "source": "/socket.io/(.*)", "destination": "/socket-stub.js" }
+  ]
+}
