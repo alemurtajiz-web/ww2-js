@@ -7210,6 +7210,7 @@ function startBerlinEndCinematic() {
     berlinCinematicActors = [];
     berlinCinematicExtras = [];
     _berlinLoudspeakerPlayed = false;
+    _berlinCrowdCheerPlayed = false;
 
     // Stop normal game
     gameRunning = false;
@@ -7411,6 +7412,123 @@ function _berlinPlayGunshot() {
         g3.gain.value = 0.15;
         g1.connect(delay); delay.connect(g3); g3.connect(audioCtx.destination);
     } catch (_) {}
+}
+
+let _berlinCrowdCheerPlayed = false;
+function _berlinPlayCrowdCheer() {
+    if (_berlinCrowdCheerPlayed) return;
+    _berlinCrowdCheerPlayed = true;
+
+    // === Layer 1: Crowd roar using Web Audio noise shaped as cheering ===
+    if (audioCtx) {
+        try {
+            const t = audioCtx.currentTime;
+            // Big crowd roar — filtered noise that swells up
+            const roar = audioCtx.createBufferSource();
+            const dur = 6.0;
+            const rb = audioCtx.createBuffer(1, audioCtx.sampleRate * dur, audioCtx.sampleRate);
+            const rd = rb.getChannelData(0);
+            for (let i = 0; i < rd.length; i++) {
+                const sec = i / audioCtx.sampleRate;
+                // Envelope: fade in over 0.5s, sustain with pulsing, fade out last 1s
+                const fadeIn = Math.min(sec / 0.5, 1);
+                const fadeOut = sec > dur - 1.0 ? (dur - sec) / 1.0 : 1;
+                // Pulsing for crowd waves of cheering
+                const pulse = 0.7 + 0.3 * Math.sin(sec * 2.5) * Math.sin(sec * 1.1);
+                const env = fadeIn * fadeOut * pulse;
+                rd[i] = (Math.random() * 2 - 1) * env * 0.35;
+            }
+            roar.buffer = rb;
+            // Bandpass to sound like human voices
+            const bp1 = audioCtx.createBiquadFilter();
+            bp1.type = 'bandpass'; bp1.frequency.value = 800; bp1.Q.value = 0.5;
+            const bp2 = audioCtx.createBiquadFilter();
+            bp2.type = 'peaking'; bp2.frequency.value = 2500; bp2.gain.value = 6; bp2.Q.value = 1;
+            const rg = audioCtx.createGain(); rg.gain.value = 0.6;
+            roar.connect(bp1); bp1.connect(bp2); bp2.connect(rg); rg.connect(audioCtx.destination);
+            roar.start(t);
+
+            // Individual shouts — short noise bursts at different pitches staggered over time
+            for (let s = 0; s < 12; s++) {
+                const delay = 0.1 + Math.random() * 2.5;
+                const shout = audioCtx.createBufferSource();
+                const sDur = 0.3 + Math.random() * 0.5;
+                const sb = audioCtx.createBuffer(1, audioCtx.sampleRate * sDur, audioCtx.sampleRate);
+                const sd = sb.getChannelData(0);
+                for (let i = 0; i < sd.length; i++) {
+                    const env2 = i < sd.length * 0.1 ? i / (sd.length * 0.1) :
+                                 i > sd.length * 0.6 ? (sd.length - i) / (sd.length * 0.4) : 1;
+                    sd[i] = (Math.random() * 2 - 1) * env2 * 0.4;
+                }
+                shout.buffer = sb;
+                const sbp = audioCtx.createBiquadFilter();
+                sbp.type = 'bandpass';
+                sbp.frequency.value = 600 + Math.random() * 1200; // varied pitch per person
+                sbp.Q.value = 1.5 + Math.random();
+                const sg = audioCtx.createGain(); sg.gain.value = 0.3 + Math.random() * 0.3;
+                shout.connect(sbp); sbp.connect(sg); sg.connect(audioCtx.destination);
+                shout.start(t + delay);
+            }
+
+            // Repeat crowd swells — second and third wave of cheering
+            for (let w = 0; w < 2; w++) {
+                const wDelay = 2.5 + w * 2.5;
+                const wave = audioCtx.createBufferSource();
+                const wDur = 2.0;
+                const wb = audioCtx.createBuffer(1, audioCtx.sampleRate * wDur, audioCtx.sampleRate);
+                const wd = wb.getChannelData(0);
+                for (let i = 0; i < wd.length; i++) {
+                    const sec2 = i / audioCtx.sampleRate;
+                    const e = Math.sin(sec2 / wDur * Math.PI);
+                    wd[i] = (Math.random() * 2 - 1) * e * 0.3;
+                }
+                wave.buffer = wb;
+                const wbp = audioCtx.createBiquadFilter();
+                wbp.type = 'bandpass'; wbp.frequency.value = 900 + w * 200; wbp.Q.value = 0.6;
+                const wg = audioCtx.createGain(); wg.gain.value = 0.5;
+                wave.connect(wbp); wbp.connect(wg); wg.connect(audioCtx.destination);
+                wave.start(t + wDelay);
+            }
+        } catch (_) {}
+    }
+
+    // === Layer 2: Actual "Hurra!" voices using Speech Synthesis ===
+    if ('speechSynthesis' in window) {
+        const synth = window.speechSynthesis;
+        const voices = synth.getVoices();
+        const enVoices = voices.filter(v => v.lang.startsWith('en'));
+
+        // Stagger multiple "Hurra!" shouts with different voices/pitches
+        const shouts = [
+            { text: 'Hurra!', delay: 0, pitch: 1.3, rate: 1.4, vol: 1.0 },
+            { text: 'Hurra! Hurra!', delay: 300, pitch: 0.8, rate: 1.2, vol: 0.9 },
+            { text: 'Hurra!', delay: 600, pitch: 1.5, rate: 1.6, vol: 0.8 },
+            { text: 'The war is over!', delay: 1000, pitch: 1.1, rate: 1.3, vol: 0.9 },
+            { text: 'Hurra! Hurra! Hurra!', delay: 1500, pitch: 0.7, rate: 1.1, vol: 1.0 },
+            { text: 'We are free!', delay: 2000, pitch: 1.4, rate: 1.3, vol: 0.85 },
+            { text: 'Hurra!', delay: 2500, pitch: 1.0, rate: 1.5, vol: 0.9 },
+            { text: 'Finally! Finally!', delay: 2800, pitch: 0.9, rate: 1.2, vol: 0.8 },
+            { text: 'Hurra! Hurra!', delay: 3500, pitch: 1.2, rate: 1.4, vol: 0.95 },
+            { text: 'It is over!', delay: 4000, pitch: 0.75, rate: 1.1, vol: 0.85 },
+            { text: 'Hurra!', delay: 4500, pitch: 1.6, rate: 1.5, vol: 0.9 },
+            { text: 'Hurra! Hurra! Hurra!', delay: 5200, pitch: 1.0, rate: 1.3, vol: 1.0 },
+        ];
+
+        for (const s of shouts) {
+            setTimeout(() => {
+                if (!berlinCinematicActive) return;
+                const msg = new SpeechSynthesisUtterance(s.text);
+                msg.pitch = s.pitch;
+                msg.rate = s.rate;
+                msg.volume = s.vol;
+                // Pick a random voice for variety
+                if (enVoices.length > 0) {
+                    msg.voice = enVoices[Math.floor(Math.random() * enVoices.length)];
+                }
+                synth.speak(msg);
+            }, s.delay);
+        }
+    }
 }
 
 let _berlinLoudspeakerPlayed = false;
@@ -7927,9 +8045,10 @@ function updateBerlinCinematic(dt) {
             }
         }
 
-        // HURRA text
+        // HURRA text + crowd cheering audio
         if (berlinCinematicTimer > 1.5 && berlinCinematicTimer < 1.7) {
             document.getElementById('berlinHurra').classList.add('visible');
+            _berlinPlayCrowdCheer();
         }
 
         // Russian soldier also celebrates — raises fist
