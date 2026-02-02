@@ -7142,7 +7142,10 @@ function startCutscene() {
     }
 
     // Hide grounded plane during cutscene so it doesn't block the view
-    if (groundedPlane) groundedPlane.group.visible = false;
+    if (groundedPlane) {
+        groundedPlane.group.visible = false;
+        scene.remove(groundedPlane.group);
+    }
 
     // Show overlay
     const overlay = document.getElementById('cutsceneOverlay');
@@ -7246,7 +7249,10 @@ function endCutscene() {
     DOM.hud.style.display = 'block';
 
     // Show grounded plane again
-    if (groundedPlane) groundedPlane.group.visible = true;
+    if (groundedPlane) {
+        groundedPlane.group.visible = true;
+        scene.add(groundedPlane.group);
+    }
 
     // Now do the stuff that was previously in startGame after createMap
     createPlayer();
