@@ -860,6 +860,39 @@
             font-size: 10px;
         }
 
+        /* Enter vehicle button (plane/tank) */
+        #enterVehicleBtn {
+            width: 50px; height: 50px;
+            left: 150px; bottom: 80px;
+            background: rgba(100,200,100,0.15);
+            border: 2px solid rgba(100,200,100,0.35);
+            font-size: 14px;
+            font-weight: bold;
+            letter-spacing: 1px;
+            display: none;
+        }
+        #enterVehicleBtn.active {
+            background: rgba(100,200,100,0.4);
+            border-color: rgba(100,200,100,0.6);
+        }
+        #enterVehicleBtn.show {
+            display: flex;
+        }
+
+        /* Camera toggle button (vehicle 1st/3rd person) */
+        #camToggleBtn {
+            width: 50px; height: 50px;
+            left: 150px; bottom: 140px;
+            background: rgba(150,150,255,0.15);
+            border: 2px solid rgba(150,150,255,0.35);
+            font-size: 9px;
+            letter-spacing: 1px;
+            display: none;
+        }
+        #camToggleBtn.show {
+            display: flex;
+        }
+
         /* Weapon buttons */
         #weaponBtns {
             position: fixed;
@@ -1698,6 +1731,8 @@
     <div id="jumpBtn">JMP</div>
     <div id="sprintBtn">RUN</div>
     <div id="grenadeBtn">GRN</div>
+    <div id="enterVehicleBtn">F</div>
+    <div id="camToggleBtn">CAM</div>
     <div id="weaponBtns">
         <div class="weapon-btn" data-idx="0">1</div>
         <div class="weapon-btn" data-idx="1">2</div>

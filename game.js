@@ -2511,6 +2511,24 @@ function setupTouchInput() {
         if (gameRunning && player && player.alive) throwGrenade();
     }, { passive: false });
 
+    // ---- ENTER VEHICLE BUTTON (plane / tank) ----
+    const enterVehicleBtn = document.getElementById('enterVehicleBtn');
+    addListener(enterVehicleBtn, 'touchstart', e => {
+        e.preventDefault();
+        if (!gameRunning || !player || !player.alive) return;
+        if (playerInTank) { exitTank(); }
+        else if (playerFlying) { exitPlane(); }
+        else { if (!tryEnterTank()) togglePlane(); }
+    }, { passive: false });
+
+    // ---- CAMERA TOGGLE BUTTON (1st / 3rd person in vehicle) ----
+    const camToggleBtn = document.getElementById('camToggleBtn');
+    addListener(camToggleBtn, 'touchstart', e => {
+        e.preventDefault();
+        if (playerFlying) planeCamMode = planeCamMode === 'first' ? 'third' : 'first';
+        if (playerInTank) tankCamMode = tankCamMode === 'first' ? 'third' : 'first';
+    }, { passive: false });
+
     // ---- WEAPON SWITCH BUTTONS ----
     weaponBtns.forEach(btn => {
         addListener(btn, 'touchstart', e => {
@@ -4959,6 +4977,13 @@ function enterTank(tankObj) {
     document.getElementById('tankPrompt').style.display = 'none';
     document.getElementById('planePrompt').style.display = 'none';
 
+    // Touch: show EXIT + CAM buttons
+    if (IS_TOUCH) {
+        const evBtn = document.getElementById('enterVehicleBtn');
+        evBtn.classList.add('show'); evBtn.textContent = 'EXIT';
+        document.getElementById('camToggleBtn').classList.add('show');
+    }
+
     // Brief screen blackout for mount transition
     DOM.damageVignette.style.opacity = '0.6';
     safeTimeout(() => { DOM.damageVignette.style.opacity = '0'; }, 250);
@@ -5014,6 +5039,12 @@ function exitTank() {
     DOM.damageVignette.style.opacity = '0.5';
     safeTimeout(() => { DOM.damageVignette.style.opacity = '0'; }, 200);
 
+    // Touch: hide vehicle buttons
+    if (IS_TOUCH) {
+        document.getElementById('enterVehicleBtn').classList.remove('show');
+        document.getElementById('camToggleBtn').classList.remove('show');
+    }
+
     playSound('footstep', 0.8);
 }
 
@@ -5052,6 +5083,12 @@ function ejectFromTank() {
     document.getElementById('tankHud').style.display = 'none';
     document.getElementById('tankScope').style.display = 'none';
     document.getElementById('tankCrosshair').style.display = 'none';
+
+    // Touch: hide vehicle buttons
+    if (IS_TOUCH) {
+        document.getElementById('enterVehicleBtn').classList.remove('show');
+        document.getElementById('camToggleBtn').classList.remove('show');
+    }
 
     // Eject damage
     player.hp -= 30;
@@ -5294,6 +5331,12 @@ function updateTankPrompt() {
         if (Math.sqrt(dx * dx + dz * dz) < 8) { near = true; break; }
     }
     document.getElementById('tankPrompt').style.display = near ? 'block' : 'none';
+    // Show enter vehicle button on touch when near tank
+    if (IS_TOUCH) {
+        const evBtn = document.getElementById('enterVehicleBtn');
+        if (near) { evBtn.classList.add('show'); evBtn.textContent = 'ENTER'; }
+        else if (!playerInTank && !playerFlying) { /* let plane check handle it */ }
+    }
     // Hide plane prompt when tank prompt is showing so they don't overlap
     if (near) document.getElementById('planePrompt').style.display = 'none';
 }
@@ -5698,6 +5741,14 @@ function enterPlane() {
     // Show flight HUD, hide normal ammo hud
     document.getElementById('flightHud').style.display = 'block';
     document.getElementById('planePrompt').style.display = 'none';
+
+    // Touch: show EXIT + CAM buttons
+    if (IS_TOUCH) {
+        const evBtn = document.getElementById('enterVehicleBtn');
+        evBtn.classList.add('show'); evBtn.textContent = 'EXIT';
+        document.getElementById('camToggleBtn').classList.add('show');
+    }
+
     playSound('planeEngine', 0.8);
 }
 
@@ -5727,6 +5778,12 @@ function exitPlane() {
     if (weaponModel) weaponModel.visible = true;
     // Hide flight HUD
     document.getElementById('flightHud').style.display = 'none';
+
+    // Touch: hide vehicle buttons
+    if (IS_TOUCH) {
+        document.getElementById('enterVehicleBtn').classList.remove('show');
+        document.getElementById('camToggleBtn').classList.remove('show');
+    }
 
     // Respawn grounded plane after a delay
     planeRespawnTimer = performance.now() + 15000;
@@ -5758,6 +5815,12 @@ function ejectFromPlane() {
 
     if (weaponModel) weaponModel.visible = true;
     document.getElementById('flightHud').style.display = 'none';
+
+    // Touch: hide vehicle buttons
+    if (IS_TOUCH) {
+        document.getElementById('enterVehicleBtn').classList.remove('show');
+        document.getElementById('camToggleBtn').classList.remove('show');
+    }
 
     // Fall damage
     player.hp -= 25;
@@ -5922,7 +5985,16 @@ function updateGroundedPlanePrompt() {
     const gp = groundedPlane.group.position;
     const dx = player.x - gp.x, dz = player.z - gp.z;
     const dist = Math.sqrt(dx * dx + dz * dz);
-    document.getElementById('planePrompt').style.display = dist < 12 ? 'block' : 'none';
+    const nearPlane = dist < 12;
+    document.getElementById('planePrompt').style.display = nearPlane ? 'block' : 'none';
+    // Show enter vehicle button on touch when near plane
+    if (IS_TOUCH) {
+        const evBtn = document.getElementById('enterVehicleBtn');
+        if (nearPlane) { evBtn.classList.add('show'); evBtn.textContent = 'FLY'; }
+        else if (!playerInTank && !playerFlying && document.getElementById('tankPrompt').style.display !== 'block') {
+            evBtn.classList.remove('show');
+        }
+    }
 }
 
 // ---- UPDATE ----
