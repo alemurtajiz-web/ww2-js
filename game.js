@@ -7489,10 +7489,35 @@ function _berlinPlayCrowdCheer() {
                 wave.connect(wbp); wbp.connect(wg); wg.connect(audioCtx.destination);
                 wave.start(t + wDelay);
             }
+            // Sobbing / crying sounds — wavering tonal noise
+            for (let cry = 0; cry < 4; cry++) {
+                const cryDelay = 1.0 + cry * 1.8 + Math.random() * 0.5;
+                const cryDur = 1.5 + Math.random() * 1.0;
+                const cryBuf = audioCtx.createBuffer(1, audioCtx.sampleRate * cryDur, audioCtx.sampleRate);
+                const cryD = cryBuf.getChannelData(0);
+                const cryFreq = 300 + cry * 100 + Math.random() * 150;
+                for (let i = 0; i < cryD.length; i++) {
+                    const sec3 = i / audioCtx.sampleRate;
+                    // Hiccupy envelope — quick inhale, shaky exhale
+                    const breath = Math.sin(sec3 * 4) > 0 ? 1.0 : 0.3;
+                    const shake = 1 + Math.sin(sec3 * 25) * 0.3; // trembling
+                    const fadeEnv = Math.sin(sec3 / cryDur * Math.PI);
+                    // Tonal component (voice-like) + noise
+                    cryD[i] = (Math.sin(sec3 * cryFreq * 6.28 * shake) * 0.6 +
+                               (Math.random() * 2 - 1) * 0.4) * fadeEnv * breath * 0.12;
+                }
+                const crySrc = audioCtx.createBufferSource();
+                crySrc.buffer = cryBuf;
+                const cryBP = audioCtx.createBiquadFilter();
+                cryBP.type = 'bandpass'; cryBP.frequency.value = cryFreq; cryBP.Q.value = 2;
+                const cryG = audioCtx.createGain(); cryG.gain.value = 0.4;
+                crySrc.connect(cryBP); cryBP.connect(cryG); cryG.connect(audioCtx.destination);
+                crySrc.start(t + cryDelay);
+            }
         } catch (_) {}
     }
 
-    // === Layer 2: Actual "Hurra!" voices using Speech Synthesis ===
+    // === Layer 2: Actual emotional voices using Speech Synthesis ===
     if ('speechSynthesis' in window) {
         const synth = window.speechSynthesis;
         const voices = synth.getVoices();
@@ -7500,18 +7525,32 @@ function _berlinPlayCrowdCheer() {
 
         // Stagger multiple "Hurra!" shouts with different voices/pitches
         const shouts = [
-            { text: 'Hurra!', delay: 0, pitch: 1.3, rate: 1.4, vol: 1.0 },
-            { text: 'Hurra! Hurra!', delay: 300, pitch: 0.8, rate: 1.2, vol: 0.9 },
-            { text: 'Hurra!', delay: 600, pitch: 1.5, rate: 1.6, vol: 0.8 },
-            { text: 'The war is over!', delay: 1000, pitch: 1.1, rate: 1.3, vol: 0.9 },
-            { text: 'Hurra! Hurra! Hurra!', delay: 1500, pitch: 0.7, rate: 1.1, vol: 1.0 },
-            { text: 'We are free!', delay: 2000, pitch: 1.4, rate: 1.3, vol: 0.85 },
-            { text: 'Hurra!', delay: 2500, pitch: 1.0, rate: 1.5, vol: 0.9 },
-            { text: 'Finally! Finally!', delay: 2800, pitch: 0.9, rate: 1.2, vol: 0.8 },
-            { text: 'Hurra! Hurra!', delay: 3500, pitch: 1.2, rate: 1.4, vol: 0.95 },
-            { text: 'It is over!', delay: 4000, pitch: 0.75, rate: 1.1, vol: 0.85 },
-            { text: 'Hurra!', delay: 4500, pitch: 1.6, rate: 1.5, vol: 0.9 },
-            { text: 'Hurra! Hurra! Hurra!', delay: 5200, pitch: 1.0, rate: 1.3, vol: 1.0 },
+            // First burst — pure shock and joy
+            { text: 'Hurra!!', delay: 0, pitch: 1.4, rate: 0.9, vol: 1.0 },
+            { text: 'Oh my God! Oh my God, it is over!', delay: 200, pitch: 1.5, rate: 0.85, vol: 1.0 },
+            { text: 'Hurra!! Hurra!!', delay: 500, pitch: 0.6, rate: 0.8, vol: 1.0 },
+            // Crying with relief
+            { text: 'We survived... we survived...', delay: 900, pitch: 1.6, rate: 0.7, vol: 0.9 },
+            { text: 'Mama! Mama! The war is over!', delay: 1200, pitch: 1.7, rate: 0.85, vol: 1.0 },
+            { text: 'Thank God! Thank God!', delay: 1600, pitch: 0.7, rate: 0.75, vol: 0.95 },
+            // Building emotion
+            { text: 'Hurra! Hurra! Hurra!', delay: 2000, pitch: 1.2, rate: 0.9, vol: 1.0 },
+            { text: 'No more bombs! No more war!', delay: 2300, pitch: 0.8, rate: 0.8, vol: 0.9 },
+            { text: 'My children... my children will live!', delay: 2700, pitch: 1.55, rate: 0.7, vol: 1.0 },
+            { text: 'We are free! Finally free!', delay: 3200, pitch: 1.3, rate: 0.85, vol: 1.0 },
+            // Deep sobbing man
+            { text: 'It is over... it is finally over...', delay: 3600, pitch: 0.5, rate: 0.65, vol: 0.95 },
+            { text: 'Papa is coming home!', delay: 3900, pitch: 1.7, rate: 0.9, vol: 0.9 },
+            // Renewed cheering
+            { text: 'Hurra!! Hurra!! Hurra!!', delay: 4300, pitch: 1.0, rate: 0.85, vol: 1.0 },
+            { text: 'Peace! Peace at last!', delay: 4600, pitch: 0.65, rate: 0.75, vol: 1.0 },
+            { text: 'I cannot believe it... we made it...', delay: 5000, pitch: 1.45, rate: 0.7, vol: 0.9 },
+            // Final wave
+            { text: 'The nightmare is over!', delay: 5500, pitch: 0.8, rate: 0.8, vol: 1.0 },
+            { text: 'Hurra! Hurra! Hurra! Hurra!', delay: 5800, pitch: 1.1, rate: 0.9, vol: 1.0 },
+            { text: 'God bless us... God bless us all...', delay: 6200, pitch: 0.55, rate: 0.6, vol: 0.95 },
+            { text: 'We will never forget... never...', delay: 6700, pitch: 1.5, rate: 0.65, vol: 0.85 },
+            { text: 'Hurra!!', delay: 7200, pitch: 1.3, rate: 0.8, vol: 1.0 },
         ];
 
         for (const s of shouts) {
