@@ -7209,6 +7209,7 @@ function startBerlinEndCinematic() {
     berlinCinematicTimer = 0;
     berlinCinematicActors = [];
     berlinCinematicExtras = [];
+    _berlinLoudspeakerPlayed = false;
 
     // Stop normal game
     gameRunning = false;
@@ -7410,6 +7411,93 @@ function _berlinPlayGunshot() {
         g3.gain.value = 0.15;
         g1.connect(delay); delay.connect(g3); g3.connect(audioCtx.destination);
     } catch (_) {}
+}
+
+let _berlinLoudspeakerPlayed = false;
+function _berlinPlayLoudspeaker() {
+    if (_berlinLoudspeakerPlayed) return;
+    _berlinLoudspeakerPlayed = true;
+
+    // Use Web Speech API for the announcement
+    if ('speechSynthesis' in window) {
+        const synth = window.speechSynthesis;
+        // Cancel any pending speech
+        synth.cancel();
+
+        // Initial static crackle before speech
+        if (audioCtx) {
+            try {
+                const t = audioCtx.currentTime;
+                // Crackle/static burst
+                const crackle = audioCtx.createBufferSource();
+                const cb = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.8, audioCtx.sampleRate);
+                const cd = cb.getChannelData(0);
+                for (let i = 0; i < cd.length; i++) {
+                    const env = i < audioCtx.sampleRate * 0.05 ? i / (audioCtx.sampleRate * 0.05) :
+                                i > cd.length - audioCtx.sampleRate * 0.1 ? (cd.length - i) / (audioCtx.sampleRate * 0.1) : 1;
+                    cd[i] = (Math.random() * 2 - 1) * 0.12 * env * (0.3 + 0.7 * Math.random());
+                }
+                crackle.buffer = cb;
+                // Bandpass to sound like old speaker
+                const bp = audioCtx.createBiquadFilter();
+                bp.type = 'bandpass'; bp.frequency.value = 1200; bp.Q.value = 0.8;
+                const cg = audioCtx.createGain(); cg.gain.value = 0.4;
+                crackle.connect(bp); bp.connect(cg); cg.connect(audioCtx.destination);
+                crackle.start(t);
+
+                // Feedback tone (loudspeaker whine)
+                const whine = audioCtx.createOscillator();
+                whine.type = 'sine';
+                whine.frequency.setValueAtTime(2200, t);
+                whine.frequency.exponentialRampToValueAtTime(1800, t + 0.3);
+                const wg = audioCtx.createGain();
+                wg.gain.setValueAtTime(0.06, t);
+                wg.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+                whine.connect(wg); wg.connect(audioCtx.destination);
+                whine.start(t); whine.stop(t + 0.5);
+            } catch (_) {}
+        }
+
+        // Speak the announcement after brief static
+        setTimeout(() => {
+            const msg = new SpeechSynthesisUtterance('Attention. Attention. The Germans have lost the war. The war is over. Germany has surrendered.');
+            msg.rate = 0.85;
+            msg.pitch = 0.7;
+            msg.volume = 1.0;
+            // Try to pick a deep male voice
+            const voices = synth.getVoices();
+            const preferred = voices.find(v => v.lang.startsWith('en') && v.name.toLowerCase().includes('male')) ||
+                              voices.find(v => v.lang.startsWith('en-GB')) ||
+                              voices.find(v => v.lang.startsWith('en'));
+            if (preferred) msg.voice = preferred;
+
+            // Add periodic crackle during speech
+            msg.onstart = () => {
+                if (!audioCtx) return;
+                const crackleDuring = setInterval(() => {
+                    if (!audioCtx) { clearInterval(crackleDuring); return; }
+                    try {
+                        const t2 = audioCtx.currentTime;
+                        const pop = audioCtx.createBufferSource();
+                        const pb = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.04, audioCtx.sampleRate);
+                        const pd = pb.getChannelData(0);
+                        for (let i = 0; i < pd.length; i++) {
+                            pd[i] = (Math.random() * 2 - 1) * Math.exp(-i / (audioCtx.sampleRate * 0.008)) * 0.15;
+                        }
+                        pop.buffer = pb;
+                        const lpf = audioCtx.createBiquadFilter();
+                        lpf.type = 'bandpass'; lpf.frequency.value = 1000 + Math.random() * 800; lpf.Q.value = 1;
+                        const pg = audioCtx.createGain(); pg.gain.value = 0.25;
+                        pop.connect(lpf); lpf.connect(pg); pg.connect(audioCtx.destination);
+                        pop.start(t2);
+                    } catch (_) {}
+                }, 400 + Math.random() * 600);
+                msg.onend = () => clearInterval(crackleDuring);
+            };
+
+            synth.speak(msg);
+        }, 600);
+    }
 }
 
 function updateBerlinCinematic(dt) {
@@ -7756,6 +7844,7 @@ function updateBerlinCinematic(dt) {
         // Loudspeaker announcement at 1.5s
         if (berlinCinematicTimer > 1.5 && berlinCinematicTimer < 1.7) {
             document.getElementById('berlinAnnouncement').classList.add('visible');
+            _berlinPlayLoudspeaker();
         }
 
         if (berlinCinematicTimer > 4.0) {
@@ -7900,6 +7989,9 @@ function updateBerlinCinematic(dt) {
 
 function endBerlinCinematic() {
     berlinCinematicActive = false;
+
+    // Stop loudspeaker speech
+    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
 
     for (const actor of berlinCinematicActors) {
         scene.remove(actor.group);
